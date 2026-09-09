@@ -10,7 +10,6 @@ import {
   UpdateCharacterRequest,
   UpdateProfileRequest,
   GeneratedCharacterDto,
-  ChatMessage,
   SendMessageResponse,
   User,
   CharacterMemory,
@@ -23,7 +22,8 @@ import {
   SceneImageStatusResponse,
 } from "@/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5010/api/v1";
+const ACCOUNT_API_BASE_URL = process.env.NEXT_PUBLIC_ACCOUNT_API_URL || "http://localhost:5000/api/v1";
 
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return "";
@@ -35,7 +35,7 @@ export function resolveMediaUrl(url?: string | null): string {
   ) {
     return url;
   }
-  const backendHost = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1").replace(/\/api\/v1\/?$/, "");
+  const backendHost = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5010/api/v1").replace(/\/api\/v1\/?$/, "");
   if (url.startsWith("/")) {
     return `${backendHost}${url}`;
   }
@@ -52,16 +52,38 @@ function getAuthHeader(): Record<string, string> {
   return {};
 }
 
-function extractErrorMessage(errorJson: any): string | undefined {
+function mapAccountUserToUser(data: Record<string, unknown> | null | undefined): User {
+  const obj = data || {};
+  const item = (typeof obj.data === "object" && obj.data !== null
+    ? obj.data
+    : typeof obj.value === "object" && obj.value !== null
+    ? obj.value
+    : obj) as Record<string, unknown>;
+
+  return {
+    id: String(item.userId || item.id || ""),
+    email: String(item.email || ""),
+    userName: String(item.username || item.userName || ""),
+    displayName: String(item.displayName || item.username || "User"),
+    avatarUrl: String(item.avatarUrl || ""),
+    createdAt: String(item.createdAt || new Date().toISOString()),
+  };
+}
+
+function extractErrorMessage(errorJson: Record<string, unknown> | null | undefined): string | undefined {
   if (!errorJson) return undefined;
   if (Array.isArray(errorJson.errors) && errorJson.errors.length > 0) {
-    return errorJson.errors[0];
+    return String(errorJson.errors[0]);
   }
   if (errorJson.errors && typeof errorJson.errors === "object") {
     const values = Object.values(errorJson.errors).flat();
     if (values.length > 0) return String(values[0]);
   }
-  return errorJson.message || errorJson.title || undefined;
+  return typeof errorJson.message === "string"
+    ? errorJson.message
+    : typeof errorJson.title === "string"
+    ? errorJson.title
+    : undefined;
 }
 
 function localizeError(rawError: string | undefined, defaultMessage: string): string {
@@ -71,7 +93,7 @@ function localizeError(rawError: string | undefined, defaultMessage: string): st
   if (lower.includes("email is already in use") || lower.includes("already in use") || lower.includes("conflict")) {
     return "Email này đã được sử dụng. Vui lòng đăng nhập hoặc sử dụng email khác.";
   }
-  if (lower.includes("invalid email or password") || lower.includes("unauthorized")) {
+  if (lower.includes("invalid email or password") || lower.includes("unauthorized") || lower.includes("invalid_credentials")) {
     return "Email hoặc mật khẩu không chính xác. Vui lòng thử lại!";
   }
   if (lower.includes("character") && lower.includes("not found")) {
@@ -88,7 +110,7 @@ function localizeError(rawError: string | undefined, defaultMessage: string): st
 }
 
 export async function loginUser(req: LoginRequest): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+  const res = await fetch(`${ACCOUNT_API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -98,20 +120,21 @@ export async function loginUser(req: LoginRequest): Promise<AuthResponse> {
     const rawError = extractErrorMessage(errorJson);
     throw new Error(localizeError(rawError, "Email hoặc mật khẩu không chính xác. Vui lòng thử lại!"));
   }
-  const json: ApiResponse<AuthResponse> = await res.json();
-  return json.data;
+  const json = await res.json();
+  const token = json?.token || json?.data?.token;
+  const user = mapAccountUserToUser(json);
+  return { token, user };
 }
 
 export async function registerUser(req: RegisterRequest): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+  const res = await fetch(`${ACCOUNT_API_BASE_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       email: req.email,
       password: req.password,
       userName: req.userName || undefined,
-      displayName: req.displayName || "User",
-      avatarUrl: req.avatarUrl || null,
+      displayName: req.displayName || undefined,
     }),
   });
   if (!res.ok) {
@@ -119,26 +142,31 @@ export async function registerUser(req: RegisterRequest): Promise<AuthResponse> 
     const rawError = extractErrorMessage(errorJson);
     throw new Error(localizeError(rawError, "Đăng ký không thành công. Vui lòng thử lại!"));
   }
-  const json: ApiResponse<AuthResponse> = await res.json();
-  return json.data;
+  const json = await res.json();
+  const token = json?.token || json?.data?.token;
+  const user = mapAccountUserToUser(json);
+  return { token, user };
 }
 
 export async function updateAuthProfile(req: UpdateProfileRequest): Promise<User> {
-  const res = await fetch(`${API_BASE_URL}/auth/profile`, {
+  const res = await fetch(`${ACCOUNT_API_BASE_URL}/profile/me`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
       ...getAuthHeader(),
     },
-    body: JSON.stringify(req),
+    body: JSON.stringify({
+      displayName: req.displayName || undefined,
+      avatarUrl: req.avatarUrl || undefined,
+    }),
   });
   if (!res.ok) {
     const errorJson = await res.json().catch(() => null);
     const rawError = extractErrorMessage(errorJson);
     throw new Error(localizeError(rawError, "Không thể cập nhật hồ sơ. Vui lòng thử lại!"));
   }
-  const json: ApiResponse<User> = await res.json();
-  return json.data;
+  const json = await res.json();
+  return mapAccountUserToUser(json);
 }
 
 export async function fetchCurrentUser(): Promise<User | null> {
@@ -146,13 +174,20 @@ export async function fetchCurrentUser(): Promise<User | null> {
     const authHeader = getAuthHeader();
     if (!authHeader.Authorization) return null;
 
-    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+    const res = await fetch(`${ACCOUNT_API_BASE_URL}/profile/me`, {
       headers: { ...authHeader },
       cache: "no-store",
     });
-    if (!res.ok) return null;
-    const json: ApiResponse<User> = await res.json();
-    return json.data || null;
+    if (!res.ok) {
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("nyxoris_auth_token");
+        }
+      }
+      return null;
+    }
+    const json = await res.json();
+    return mapAccountUserToUser(json);
   } catch (error) {
     console.warn("[API] Could not fetch current user:", error);
     return null;
@@ -583,7 +618,12 @@ export async function updateUserProfile(userId: string, req: UpdateUserProfileRe
       "Content-Type": "application/json",
       ...getAuthHeader(),
     },
-    body: JSON.stringify(req),
+    body: JSON.stringify({
+      bio: req.bio,
+      interests: req.interests,
+      personalityTraits: req.personalityTraits,
+      statusMessage: req.statusMessage,
+    }),
   });
   if (!res.ok) {
     const errorJson = await res.json().catch(() => null);

@@ -34,6 +34,29 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface AccountAuthResponseDto {
+  token: string;
+  userId: string;
+  email: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  role?: string;
+  isEmailVerified?: boolean;
+}
+
+export interface AccountProfileDto {
+  userId: string;
+  email: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  dateOfBirth?: string | null;
+  gender?: number | null;
+  isEmailVerified?: boolean;
+  role?: string;
+}
+
 export interface UserProfile {
   id: string;
   userId: string;
@@ -48,7 +71,7 @@ export interface UserProfile {
 }
 
 export interface UpdateUserProfileRequest {
-  displayName: string;
+  displayName?: string;
   avatarUrl?: string | null;
   bio?: string | null;
   interests?: string[];
