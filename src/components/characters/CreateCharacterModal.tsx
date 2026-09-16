@@ -201,6 +201,8 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
     const targetBio = (customPrompt || personalityPrompt).trim();
     const targetVisualIdentity: CharacterVisualIdentity = customVisualIdentity || {
       gender,
+      style: "Anime",
+      visualStyle: "Anime",
       hair,
       eyes,
       face,
@@ -422,6 +424,8 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
 
       const visualIdentity: CharacterVisualIdentity = {
         gender: gender || undefined,
+        style: "Anime",
+        visualStyle: "Anime",
         hair: hair.trim() || undefined,
         eyes: eyes.trim() || undefined,
         face: face.trim() || undefined,

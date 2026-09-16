@@ -162,6 +162,7 @@ export function EditCharacterModal({
         title: title.trim() || character?.title,
         category: category || character?.category,
         personalityPrompt: personalityPrompt.trim() || character?.personalityPrompt,
+        visualIdentity: character?.visualIdentity,
       });
 
       if (res?.avatarUrl) {
@@ -212,6 +213,8 @@ export function EditCharacterModal({
       };
 
       const visualIdentity: CharacterVisualIdentity = {
+        style: character.visualIdentity?.style || "Realistic",
+        visualStyle: character.visualIdentity?.visualStyle || "Realistic",
         hair: hair.trim() || undefined,
         eyes: eyes.trim() || undefined,
         clothingStyle: clothingStyle.trim() || undefined,

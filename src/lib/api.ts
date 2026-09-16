@@ -22,7 +22,7 @@ import {
   SceneImageStatusResponse,
 } from "@/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5010/api/v1";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5010/api/v1";
 const ACCOUNT_API_BASE_URL = process.env.NEXT_PUBLIC_ACCOUNT_API_URL || "http://localhost:5000/api/v1";
 
 export function resolveMediaUrl(url?: string | null): string {
@@ -35,6 +35,9 @@ export function resolveMediaUrl(url?: string | null): string {
   ) {
     return url;
   }
+  if (url.startsWith("/api/test-scene")) {
+    return url;
+  }
   const backendHost = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5010/api/v1").replace(/\/api\/v1\/?$/, "");
   if (url.startsWith("/")) {
     return `${backendHost}${url}`;
@@ -42,8 +45,8 @@ export function resolveMediaUrl(url?: string | null): string {
   return `${backendHost}/${url}`;
 }
 
-function getAuthHeader(): Record<string, string> {
-  if (typeof window !== "undefined") {
+export function getAuthHeader(): Record<string, string> {
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
     const token = localStorage.getItem("nyxoris_auth_token");
     if (token) {
       return { Authorization: `Bearer ${token}` };
@@ -70,7 +73,7 @@ function mapAccountUserToUser(data: Record<string, unknown> | null | undefined):
   };
 }
 
-function extractErrorMessage(errorJson: Record<string, unknown> | null | undefined): string | undefined {
+export function extractErrorMessage(errorJson: Record<string, unknown> | null | undefined): string | undefined {
   if (!errorJson) return undefined;
   if (Array.isArray(errorJson.errors) && errorJson.errors.length > 0) {
     return String(errorJson.errors[0]);
@@ -86,7 +89,7 @@ function extractErrorMessage(errorJson: Record<string, unknown> | null | undefin
     : undefined;
 }
 
-function localizeError(rawError: string | undefined, defaultMessage: string): string {
+export function localizeError(rawError: string | undefined, defaultMessage: string): string {
   if (!rawError) return defaultMessage;
   const lower = rawError.toLowerCase();
 
@@ -503,6 +506,42 @@ export async function generateCharacterAvatar(req: {
   return { avatarUrl, fullBodyUrl, prompt };
 }
 
+export async function generateCharacterStandee(req: {
+  name?: string;
+  title?: string;
+  category?: string;
+  personalityPrompt?: string;
+  idea?: string;
+  worldGenre?: WorldGenre | number;
+  visualIdentity?: CharacterVisualIdentity;
+  referenceImageUrl?: string;
+  avatarUrl?: string;
+  bodyReferenceUrl?: string;
+}): Promise<{ standeeUrl: string; prompt: string }> {
+  const res = await fetch(`${API_BASE_URL}/characters/generate-standee`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const errorJson = await res.json().catch(() => null);
+    const rawError = extractErrorMessage(errorJson);
+    throw new Error(localizeError(rawError, "Không thể vẽ ảnh dáng đứng bằng AI lúc này. Vui lòng thử lại!"));
+  }
+  const json = await res.json();
+  const data = json?.data ?? json?.value ?? json;
+  const rawStandeeUrl = data?.standeeUrl || data?.imageUrl || data?.fullBodyUrl || data?.url;
+  const standeeUrl = resolveMediaUrl(rawStandeeUrl);
+  const prompt = data?.revisedPrompt || data?.prompt || "";
+  if (!data || !standeeUrl) {
+    throw new Error("Không nhận được ảnh dáng đứng từ AI.");
+  }
+  return { standeeUrl, prompt };
+}
+
 export async function triggerTurnSceneImage(
   sessionId: string,
   turnId: string
@@ -546,10 +585,7 @@ export async function getSceneImageStatus(
   return statusData;
 }
 
-/**
- * @deprecated Use triggerTurnSceneImage and getSceneImageStatus instead.
- */
-export async function generateSceneImage(req: {
+export interface GenerateSceneImagePayload {
   sessionId?: string;
   characterName?: string;
   characterTitle?: string;
@@ -557,7 +593,21 @@ export async function generateSceneImage(req: {
   messageContent: string;
   userMessageContent?: string;
   referenceImageUrl?: string;
-}): Promise<{ imageUrl: string; prompt: string }> {
+  visualIdentity?: CharacterVisualIdentity;
+  worldDescription?: string;
+  sceneState?: {
+    currentLocation?: string;
+    currentPosition?: string;
+    currentOutfit?: string;
+    currentTimeOfDay?: string;
+    heldItems?: string;
+    atmosphere?: string;
+  };
+}
+
+export async function generateSceneImage(
+  req: GenerateSceneImagePayload
+): Promise<{ imageUrl: string; prompt: string }> {
   const res = await fetch(`${API_BASE_URL}/chat/imagine-scene`, {
     method: "POST",
     headers: {
@@ -573,11 +623,11 @@ export async function generateSceneImage(req: {
   }
   const json = await res.json();
   const data = json?.data ?? json?.value ?? json;
-  const imageUrl = data?.imageUrl || data?.avatarUrl || data?.url;
-  if (!data || !imageUrl) {
+  const rawImageUrl = data?.imageUrl || data?.avatarUrl || data?.url;
+  if (!data || !rawImageUrl) {
     throw new Error("Không nhận được hình ảnh minh họa từ AI.");
   }
-  return { imageUrl, prompt: data.prompt || "" };
+  return { imageUrl: resolveMediaUrl(rawImageUrl), prompt: data.prompt || "" };
 }
 
 export async function fetchCharacterMemories(characterId: string, limit: number = 30): Promise<CharacterMemory[]> {
@@ -651,4 +701,34 @@ export async function proactiveReachout(req: { characterId: string; userId: stri
   const json = await res.json();
   return json?.data || json?.value || json;
 }
+
+// ==========================================
+// SSE Streaming Client Re-exports
+// ==========================================
+export {
+  streamChatMessage,
+  getDefaultErrorMessageForStatus,
+  isAbortError,
+  generateUUID,
+  dispatchSseEvent,
+} from "./api/chatStream";
+export type {
+  StreamTokenEvent,
+  StreamMetadataEvent,
+  StreamEventUnlockedEvent,
+  StreamDoneEvent,
+  StreamErrorEvent,
+  ChatStreamEvent,
+  StreamChatOptions,
+} from "./api/chatStream";
+export {
+  createSseParser,
+  safeJsonParse,
+} from "./api/sseParser";
+export type {
+  SseRawEvent,
+  SseParserCallbacks,
+  SseParser,
+  SafeJsonParseResult,
+} from "./api/sseParser";
 

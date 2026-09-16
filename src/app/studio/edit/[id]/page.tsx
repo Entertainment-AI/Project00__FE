@@ -11,12 +11,12 @@ import {
   CharacterVisualIdentity,
   CharacterVoiceProfile,
 } from "@/types";
-import { fetchCharacterById, updateCharacter, generateCharacterAvatar } from "@/lib/api";
+import { fetchCharacterById, updateCharacter, generateCharacterAvatar, generateCharacterStandee, resolveMediaUrl } from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 import { CharacterCard } from "@/components/characters/CharacterCard";
 import { ImageCropperModal } from "@/components/ui/ImageCropperModal";
 import RelationshipMilestonesEditor from "@/components/characters/RelationshipMilestonesEditor";
-import { WORLD_GENRE_OPTIONS, getWorldGenreMeta } from "@/lib/constants";
+import { WORLD_GENRE_OPTIONS, getWorldGenreMeta, VISUAL_STYLE_OPTIONS, normalizeVisualStyle } from "@/lib/constants";
 import { useAuth } from "@/core/providers/AuthProvider";
 import {
   ArrowLeft,
@@ -36,6 +36,7 @@ import {
   Crop,
   ChevronDown,
   Lock,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -67,6 +68,9 @@ export default function EditCharacterPage() {
   const [gender, setGender] = useState("Female");
   const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
   const genderDropdownRef = useRef<HTMLDivElement>(null);
+  const [visualStyle, setVisualStyle] = useState("Anime");
+  const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
+  const styleDropdownRef = useRef<HTMLDivElement>(null);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [rawAvatarImage, setRawAvatarImage] = useState<string | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
@@ -75,6 +79,7 @@ export default function EditCharacterPage() {
   const [isFullBodyCropperOpen, setIsFullBodyCropperOpen] = useState(false);
   const fullBodyFileInputRef = useRef<HTMLInputElement>(null);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [isGeneratingStandee, setIsGeneratingStandee] = useState(false);
   const [personalityPrompt, setPersonalityPrompt] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [isPublic, setIsPublic] = useState(true);
@@ -111,6 +116,9 @@ export default function EditCharacterPage() {
       }
       if (genderDropdownRef.current && !genderDropdownRef.current.contains(event.target as Node)) {
         setIsGenderDropdownOpen(false);
+      }
+      if (styleDropdownRef.current && !styleDropdownRef.current.contains(event.target as Node)) {
+        setIsStyleDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -172,6 +180,8 @@ export default function EditCharacterPage() {
           }
 
           if (data.visualIdentity) {
+            if (data.visualIdentity.style) setVisualStyle(data.visualIdentity.style);
+            else if (data.visualIdentity.visualStyle) setVisualStyle(data.visualIdentity.visualStyle);
             if (data.visualIdentity.gender) setGender(data.visualIdentity.gender);
             else if (data.voiceProfile?.gender) setGender(data.voiceProfile.gender);
             setHair(data.visualIdentity.hair || "");
@@ -214,7 +224,7 @@ export default function EditCharacterPage() {
   );
 
   const handleGenerateAvatarAi = async () => {
-    if (isGeneratingAvatar) return;
+    if (isGeneratingAvatar || isGeneratingStandee) return;
     const targetName = (name.trim() || character?.name || "").trim();
     const targetTitle = (title.trim() || character?.title || "").trim();
     const targetBio = (personalityPrompt.trim() || character?.personalityPrompt || "").trim();
@@ -224,6 +234,7 @@ export default function EditCharacterPage() {
       return;
     }
 
+    const normalizedStyle = normalizeVisualStyle(visualStyle);
     try {
       setIsGeneratingAvatar(true);
       setError(null);
@@ -234,6 +245,8 @@ export default function EditCharacterPage() {
         worldGenre,
         visualIdentity: {
           gender,
+          style: normalizedStyle,
+          visualStyle: normalizedStyle,
           hair,
           eyes,
           face,
@@ -255,9 +268,146 @@ export default function EditCharacterPage() {
         setRawFullBodyImage(res.fullBodyUrl);
       }
     } catch {
-      setError("Không thể vẽ ảnh tự động. Vui lòng thử lại!");
+      setError("Không thể vẽ ảnh chân dung tự động. Vui lòng thử lại!");
     } finally {
       setIsGeneratingAvatar(false);
+    }
+  };
+
+  const handleGenerateStandeeAi = async () => {
+    if (isGeneratingStandee || isGeneratingAvatar) return;
+    const targetName = (name.trim() || character?.name || "").trim();
+    const targetTitle = (title.trim() || character?.title || "").trim();
+    const targetBio = (personalityPrompt.trim() || character?.personalityPrompt || "").trim();
+
+    if (!targetName || !targetTitle || !targetBio) {
+      setError("Vui lòng điền đầy đủ Tên Nhân Vật, Danh Hiệu và Tiểu Sử để AI có đủ dữ kiện vẽ ảnh dáng đứng chính xác!");
+      return;
+    }
+
+    const normalizedStyle = normalizeVisualStyle(visualStyle);
+    try {
+      setIsGeneratingStandee(true);
+      setError(null);
+      const res = await generateCharacterStandee({
+        name: targetName,
+        title: targetTitle,
+        personalityPrompt: targetBio,
+        worldGenre,
+        visualIdentity: {
+          gender,
+          style: normalizedStyle,
+          visualStyle: normalizedStyle,
+          hair,
+          eyes,
+          face,
+          ageAppearance,
+          skin,
+          body,
+          clothingStyle,
+          accessories,
+          visualTraits,
+        },
+        avatarUrl: avatarUrl || character?.avatarUrl || undefined,
+        referenceImageUrl: avatarUrl || character?.avatarUrl || undefined,
+      });
+
+      if (res?.standeeUrl) {
+        setFullBodyUrl(res.standeeUrl);
+        setRawFullBodyImage(res.standeeUrl);
+      }
+    } catch {
+      setError("Không thể vẽ ảnh dáng đứng tự động. Vui lòng thử lại!");
+    } finally {
+      setIsGeneratingStandee(false);
+    }
+  };
+
+  const handleGenerateBothImagesAi = async () => {
+    if (isGeneratingAvatar || isGeneratingStandee) return;
+    const targetName = (name.trim() || character?.name || "").trim();
+    const targetTitle = (title.trim() || character?.title || "").trim();
+    const targetBio = (personalityPrompt.trim() || character?.personalityPrompt || "").trim();
+
+    if (!targetName || !targetTitle || !targetBio) {
+      setError("Vui lòng điền đầy đủ Tên Nhân Vật, Danh Hiệu và Tiểu Sử để AI có đủ dữ kiện vẽ ảnh!");
+      return;
+    }
+
+    const normalizedStyle = normalizeVisualStyle(visualStyle);
+    let generatedAvatarUrl = avatarUrl;
+    try {
+      setIsGeneratingAvatar(true);
+      setError(null);
+      const res = await generateCharacterAvatar({
+        name: targetName,
+        title: targetTitle,
+        personalityPrompt: targetBio,
+        worldGenre,
+        visualIdentity: {
+          gender,
+          style: normalizedStyle,
+          visualStyle: normalizedStyle,
+          hair,
+          eyes,
+          face,
+          ageAppearance,
+          skin,
+          body,
+          clothingStyle,
+          accessories,
+          visualTraits,
+        },
+      });
+
+      if (res?.avatarUrl) {
+        generatedAvatarUrl = res.avatarUrl;
+        setAvatarUrl(res.avatarUrl);
+        setRawAvatarImage(res.avatarUrl);
+      }
+      if (res?.fullBodyUrl) {
+        setFullBodyUrl(res.fullBodyUrl);
+        setRawFullBodyImage(res.fullBodyUrl);
+      }
+    } catch {
+      setError("Không thể vẽ ảnh chân dung tự động. Vui lòng thử lại!");
+    } finally {
+      setIsGeneratingAvatar(false);
+    }
+
+    try {
+      setIsGeneratingStandee(true);
+      const standeeRes = await generateCharacterStandee({
+        name: targetName,
+        title: targetTitle,
+        personalityPrompt: targetBio,
+        worldGenre,
+        visualIdentity: {
+          gender,
+          style: normalizedStyle,
+          visualStyle: normalizedStyle,
+          hair,
+          eyes,
+          face,
+          ageAppearance,
+          skin,
+          body,
+          clothingStyle,
+          accessories,
+          visualTraits,
+        },
+        avatarUrl: generatedAvatarUrl || character?.avatarUrl || undefined,
+        referenceImageUrl: generatedAvatarUrl || character?.avatarUrl || undefined,
+      });
+
+      if (standeeRes?.standeeUrl) {
+        setFullBodyUrl(standeeRes.standeeUrl);
+        setRawFullBodyImage(standeeRes.standeeUrl);
+      }
+    } catch {
+      console.warn("Auto-generate standee failed after avatar generation in edit page");
+    } finally {
+      setIsGeneratingStandee(false);
     }
   };
 
@@ -297,8 +447,11 @@ export default function EditCharacterPage() {
         },
       };
 
+      const normalizedStyle = normalizeVisualStyle(visualStyle);
       const visualIdentity: CharacterVisualIdentity = {
         gender: gender || undefined,
+        style: normalizedStyle,
+        visualStyle: normalizedStyle,
         hair: hair.trim() || undefined,
         eyes: eyes.trim() || undefined,
         face: face.trim() || undefined,
@@ -379,6 +532,7 @@ export default function EditCharacterPage() {
 
   const selectedGenre = getWorldGenreMeta(worldGenre);
   const selectedGender = GENDER_OPTIONS.find((g) => g.id === gender) || GENDER_OPTIONS[0];
+  const selectedStyle = VISUAL_STYLE_OPTIONS.find((s) => s.id === visualStyle) || VISUAL_STYLE_OPTIONS[0];
 
   return (
     <div className="h-full flex flex-col bg-[#18191c] text-zinc-100 overflow-hidden selection:bg-[#353740] selection:text-white">
@@ -444,15 +598,21 @@ export default function EditCharacterPage() {
                               if (avatarUrl && !isGeneratingAvatar) {
                                 setRawAvatarImage(avatarUrl);
                                 setIsCropperOpen(true);
-                              } else {
+                              } else if (!isGeneratingAvatar) {
                                 fileInputRef.current?.click();
                               }
                             }}
                             className="relative w-24 h-24 sm:w-28 sm:h-28 aspect-square rounded-full overflow-hidden bg-[#24252a] border-2 border-[#3b3d46] hover:border-zinc-300 flex items-center justify-center cursor-pointer transition-all group shadow-inner ring-2 ring-black/40"
                           >
+                            {isGeneratingAvatar && (
+                              <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center text-white text-xs z-20 p-1 text-center">
+                                <Loader2 className="h-5 w-5 animate-spin text-zinc-300 mb-1" />
+                                <span className="text-[10px] text-zinc-300 leading-tight">Đang vẽ...</span>
+                              </div>
+                            )}
                             {avatarUrl ? (
                               <>
-                                <img src={avatarUrl} alt="Chân dung" className="w-full h-full object-cover" />
+                                <img src={resolveMediaUrl(avatarUrl)} alt="Chân dung" className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] font-semibold">
                                   Cắt lại
                                 </div>
@@ -467,6 +627,15 @@ export default function EditCharacterPage() {
                         </div>
 
                         <div className="flex items-center gap-1.5 mt-3">
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateAvatarAi()}
+                            disabled={isGeneratingAvatar || isGeneratingStandee || !canGenerateAvatar}
+                            className="p-1.5 rounded-lg bg-[#2b2c34] hover:bg-[#353740] border border-[#3b3d46] text-zinc-300 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-all cursor-pointer"
+                            title="Vẽ lại ảnh chân dung bằng AI"
+                          >
+                            <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
+                          </button>
                           {avatarUrl && (
                             <button
                               type="button"
@@ -497,18 +666,24 @@ export default function EditCharacterPage() {
                         <div className="flex-1 flex items-center justify-center py-1 w-full">
                           <div
                             onClick={() => {
-                              if (fullBodyUrl && !isGeneratingAvatar) {
+                              if (fullBodyUrl && !isGeneratingStandee) {
                                 setRawFullBodyImage(fullBodyUrl);
                                 setIsFullBodyCropperOpen(true);
-                              } else {
+                              } else if (!isGeneratingStandee) {
                                 fullBodyFileInputRef.current?.click();
                               }
                             }}
                             className="relative w-full max-w-[140px] sm:max-w-[160px] aspect-[2/3] rounded-2xl overflow-hidden bg-[#24252a] border-2 border-[#3b3d46] hover:border-zinc-300 flex items-center justify-center cursor-pointer transition-all group shadow-inner ring-2 ring-black/40"
                           >
+                            {isGeneratingStandee && (
+                              <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center text-white text-xs z-20 p-2 text-center">
+                                <Loader2 className="h-6 w-6 animate-spin text-zinc-300 mb-1.5" />
+                                <span className="text-[11px] text-zinc-300 font-medium leading-tight">Đang vẽ dáng đứng...</span>
+                              </div>
+                            )}
                             {fullBodyUrl ? (
                               <>
-                                <img src={fullBodyUrl} alt="Dáng đứng" className="w-full h-full object-cover object-top" />
+                                <img src={resolveMediaUrl(fullBodyUrl)} alt="Dáng đứng" className="w-full h-full object-cover object-top" />
                                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-semibold">
                                   Cắt lại
                                 </div>
@@ -523,6 +698,15 @@ export default function EditCharacterPage() {
                         </div>
 
                         <div className="flex items-center gap-1.5 mt-3">
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateStandeeAi()}
+                            disabled={isGeneratingAvatar || isGeneratingStandee || !canGenerateAvatar}
+                            className="p-1.5 rounded-lg bg-[#2b2c34] hover:bg-[#353740] border border-[#3b3d46] text-zinc-300 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-all cursor-pointer"
+                            title="Vẽ lại ảnh dáng đứng bằng AI"
+                          >
+                            <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
+                          </button>
                           {fullBodyUrl && (
                             <button
                               type="button"
@@ -588,8 +772,8 @@ export default function EditCharacterPage() {
                     <div className="w-full mt-4">
                       <button
                         type="button"
-                        onClick={() => handleGenerateAvatarAi()}
-                        disabled={isGeneratingAvatar || !canGenerateAvatar}
+                        onClick={() => handleGenerateBothImagesAi()}
+                        disabled={isGeneratingAvatar || isGeneratingStandee || !canGenerateAvatar}
                         title={
                           !canGenerateAvatar
                             ? "Vui lòng điền Tên, Danh hiệu và Tiểu sử trước khi vẽ ảnh"
@@ -597,8 +781,19 @@ export default function EditCharacterPage() {
                         }
                         className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#2b2c34] border border-[#3b3d46] text-zinc-200 hover:bg-[#353740] disabled:opacity-35 disabled:hover:bg-[#2b2c34] disabled:cursor-not-allowed text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-sm"
                       >
-                        <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
-                        {isGeneratingAvatar ? "AI Đang Vẽ 2 Ảnh..." : "AI Vẽ Cả 2 Ảnh"}
+                        {isGeneratingAvatar || isGeneratingStandee ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-300" />
+                            {isGeneratingAvatar
+                              ? "AI Đang Vẽ Chân Dung..."
+                              : "AI Đang Vẽ Dáng Đứng..."}
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
+                            AI Vẽ Cả 2 Ảnh
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -660,17 +855,70 @@ export default function EditCharacterPage() {
                       </div>
                     </div>
 
-                    {/* Row 2: Danh Hiệu / Nghề Nghiệp (Full Width) */}
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                        Danh Hiệu / Nghề Nghiệp <span className="text-zinc-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        className="w-full rounded-xl border border-[#31333c] bg-[#16171b] px-3.5 py-2.5 text-xs sm:text-sm text-zinc-100 focus:border-zinc-400 focus:outline-none"
-                      />
+                    {/* Row 2: Danh Hiệu / Nghề Nghiệp & Phong Cách Visual */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                      <div className="sm:col-span-7">
+                        <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                          Danh Hiệu / Nghề Nghiệp <span className="text-zinc-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="Nữ Họa Sĩ Tự Do, Bác Sĩ Tâm Lý Trực Đêm..."
+                          className="w-full rounded-xl border border-[#31333c] bg-[#16171b] px-3.5 py-2.5 text-xs sm:text-sm text-zinc-100 focus:border-zinc-400 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Phong Cách Visual (Visual Style: Hoạt Họa ↔ Chân Thực) */}
+                      <div className="sm:col-span-5 relative" ref={styleDropdownRef}>
+                        <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                          Phong Cách Visual
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsStyleDropdownOpen(!isStyleDropdownOpen)}
+                          className="w-full flex items-center justify-between rounded-xl border border-[#31333c] bg-[#16171b] px-3.5 py-2.5 text-xs sm:text-sm text-zinc-100 hover:border-zinc-400 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                            <span className="truncate font-medium">{selectedStyle.label}</span>
+                          </div>
+                          <ChevronDown className={`h-4 w-4 text-zinc-400 shrink-0 ml-1 transition-transform ${isStyleDropdownOpen ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {isStyleDropdownOpen && (
+                          <div className="absolute right-0 top-full mt-1.5 w-full rounded-xl border border-[#383a45] bg-[#1c1d22] p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-1">
+                            <div className="space-y-1">
+                              {VISUAL_STYLE_OPTIONS.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setVisualStyle(s.id);
+                                    setIsStyleDropdownOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                                    visualStyle === s.id
+                                      ? "bg-zinc-800 text-white font-bold"
+                                      : "text-zinc-300 hover:bg-[#282932] hover:text-white"
+                                  }`}
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <div className="font-medium text-xs text-zinc-100">
+                                      {s.label}
+                                    </div>
+                                    <div className="text-[10px] text-zinc-400 font-normal truncate mt-0.5">
+                                      {s.desc}
+                                    </div>
+                                  </div>
+                                  {visualStyle === s.id && <Check className="h-3.5 w-3.5 text-zinc-300 shrink-0" />}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Row 3: Thẻ Từ Khóa */}

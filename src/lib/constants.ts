@@ -23,3 +23,26 @@ export function getWorldGenreMeta(genre?: WorldGenre | number) {
   const numeric = Number(genre);
   return WORLD_GENRE_OPTIONS.find((g) => g.id === numeric) || WORLD_GENRE_OPTIONS[0];
 }
+
+export interface VisualStyleOption {
+  id: string;
+  label: string;
+  model: string;
+  desc: string;
+}
+
+export const VISUAL_STYLE_OPTIONS: VisualStyleOption[] = [
+  { id: "Anime", label: "Hoạt Họa", model: "MeiNaMix", desc: "Phong cách nghệ thuật anime 2D, manga & tranh vẽ sống động" },
+  { id: "Realistic", label: "Chân Thực", model: "majicMIX Realistic", desc: "Phong cách người thật chân thực, ánh sáng tự nhiên & đậm chất điện ảnh" },
+];
+
+export function normalizeVisualStyle(raw?: string | number): string {
+  if (!raw && raw !== 0) return "Realistic";
+  const str = String(raw).trim().toLowerCase();
+
+  if (str === "anime" || str === "1" || str === "hoạt họa") {
+    return "Anime";
+  }
+
+  return "Realistic";
+}

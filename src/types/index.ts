@@ -149,6 +149,8 @@ export interface CharacterVisualIdentity {
   visualTraits?: string;
   canonicalReferenceUrl?: string;
   fullBodyUrl?: string;
+  style?: string;
+  visualStyle?: string;
 }
 
 export interface CharacterVoiceProfile {
@@ -296,6 +298,7 @@ export interface ChatMessage {
   sceneImageUrl?: string | null;
   sceneImageStatus?: "queued" | "pending" | "processing" | "completed" | "failed" | "timeout" | "cancelled" | null;
   generationRequestId?: string | null;
+  isStreaming?: boolean | null;
 }
 
 export interface TriggerSceneImageResponse {

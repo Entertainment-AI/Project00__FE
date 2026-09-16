@@ -192,7 +192,7 @@ export const formatMessageContent = (content: string, theme: ThemeConfig) => {
                 <span className="tracking-wide">Tâm tư thầm kín</span>
               </div>
               <p className={`italic ${theme.thoughtText} text-[13px] leading-relaxed font-normal pl-1`}>
-                "{thoughtText}"
+                &quot;{thoughtText}&quot;
               </p>
             </div>
           );
@@ -215,7 +215,7 @@ export const formatMessageContent = (content: string, theme: ThemeConfig) => {
                 <span className="tracking-wide">{actionMeta.label}</span>
               </div>
               <p className="italic text-zinc-300 font-normal leading-relaxed text-[13px] pl-0.5">
-                "{displayText}"
+                &quot;{displayText}&quot;
               </p>
             </div>
           );
@@ -315,7 +315,19 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             </div>
           )}
 
-          <div>{formatMessageContent(msg.content, theme)}</div>
+          <div>
+            {msg.content ? (
+              formatMessageContent(msg.content, theme)
+            ) : msg.isStreaming ? (
+              <div className="flex items-center gap-2 py-1 text-zinc-400 text-xs italic">
+                <span className="inline-block h-2 w-2 rounded-full bg-zinc-400 animate-pulse" />
+                <span>Đang suy nghĩ...</span>
+              </div>
+            ) : null}
+            {msg.isStreaming && msg.content && (
+              <span className="inline-block w-1.5 h-3.5 ml-1 align-middle bg-zinc-300 animate-pulse rounded-xs" />
+            )}
+          </div>
 
           {/* 1. In-Flight Initial Generation (when no prior image exists) */}
           {isGeneratingThisTurn && !sceneImageUrl && (
@@ -484,85 +496,94 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             </span>
 
             <div className="flex items-center gap-2 shrink-0">
-              {canRollback && (
-                <button
-                  type="button"
-                  onClick={() => onRollback(msg.id, index)}
-                  disabled={isSending || isRollingBack}
-                  className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-amber-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                  title="Quay về mốc hội thoại này (Xóa tin nhắn phía sau để rẽ nhánh mới)"
-                >
-                  <Undo2 className="h-3 w-3 text-amber-400" />
-                  <span>Quay về đây</span>
-                </button>
-              )}
-
-              {!isUser && !isOpeningMessage && onImagineScene && effectiveTurnId && !sceneImageUrl && !isGeneratingThisTurn && (
-                <button
-                  type="button"
-                  onClick={() => onImagineScene(effectiveTurnId)}
-                  disabled={isSending || isGeneratingThisTurn}
-                  className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-purple-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                  title="AI vẽ lại khoảnh khắc nhân vật trong câu thoại này"
-                >
-                  <Sparkles className="h-3 w-3 text-purple-400" />
-                  <span>Vẽ cảnh</span>
-                </button>
-              )}
-
-              {isLatestAI && (
+              {msg.isStreaming ? (
+                <span className="text-[11px] text-zinc-400 italic flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 animate-ping" />
+                  Đang phản hồi...
+                </span>
+              ) : (
                 <>
+                  {canRollback && (
+                    <button
+                      type="button"
+                      onClick={() => onRollback(msg.id, index)}
+                      disabled={isSending || isRollingBack}
+                      className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-amber-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                      title="Quay về mốc hội thoại này (Xóa tin nhắn phía sau để rẽ nhánh mới)"
+                    >
+                      <Undo2 className="h-3 w-3 text-amber-400" />
+                      <span>Quay về đây</span>
+                    </button>
+                  )}
+
+                  {!isUser && !isOpeningMessage && onImagineScene && effectiveTurnId && !sceneImageUrl && !isGeneratingThisTurn && (
+                    <button
+                      type="button"
+                      onClick={() => onImagineScene(effectiveTurnId)}
+                      disabled={isSending || isGeneratingThisTurn}
+                      className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-purple-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                      title="AI vẽ lại khoảnh khắc nhân vật trong câu thoại này"
+                    >
+                      <Sparkles className="h-3 w-3 text-purple-400" />
+                      <span>Vẽ cảnh</span>
+                    </button>
+                  )}
+
+                  {isLatestAI && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onFetchSuggestions}
+                        disabled={isSending || isLoadingSuggestions}
+                        className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-amber-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                        title="AI gợi ý 3 hướng phản hồi tiếp theo"
+                      >
+                        {isLoadingSuggestions ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                        ) : (
+                          <Lightbulb className="h-3 w-3 text-amber-400" />
+                        )}
+                        <span>Gợi ý</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={onContinueStory}
+                        disabled={isSending}
+                        className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-cyan-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                        title="Tiếp tục cốt truyện / AI tự hành động tiếp"
+                      >
+                        <FastForward className="h-3 w-3 text-cyan-400" />
+                        <span>Tiếp tục</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={onRegenerate}
+                        disabled={isSending}
+                        className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-amber-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                        title="Tạo lại phản hồi khác cho lượt này"
+                      >
+                        <RotateCcw className="h-3 w-3 text-amber-400" />
+                        <span>Tạo mới</span>
+                      </button>
+                    </>
+                  )}
+
                   <button
                     type="button"
-                    onClick={onFetchSuggestions}
-                    disabled={isSending || isLoadingSuggestions}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-amber-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                    title="AI gợi ý 3 hướng phản hồi tiếp theo"
+                    onClick={() => onCopy(msg.id, msg.content)}
+                    className="flex items-center gap-1 rounded-lg p-1.5 text-zinc-400 hover:bg-[#272832] hover:text-zinc-200 transition-colors cursor-pointer"
+                    title="Sao chép văn bản"
                   >
-                    {isLoadingSuggestions ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                    {copiedId === msg.id ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
                     ) : (
-                      <Lightbulb className="h-3 w-3 text-amber-400" />
+                      <Copy className="h-3.5 w-3.5" />
                     )}
-                    <span>Gợi ý</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={onContinueStory}
-                    disabled={isSending}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-cyan-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                    title="Tiếp tục cốt truyện / AI tự hành động tiếp"
-                  >
-                    <FastForward className="h-3 w-3 text-cyan-400" />
-                    <span>Tiếp tục</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={onRegenerate}
-                    disabled={isSending}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#272832] px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-[#323440] hover:text-amber-300 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                    title="Tạo lại phản hồi khác cho lượt này"
-                  >
-                    <RotateCcw className="h-3 w-3 text-amber-400" />
-                    <span>Tạo mới</span>
                   </button>
                 </>
               )}
-
-              <button
-                type="button"
-                onClick={() => onCopy(msg.id, msg.content)}
-                className="flex items-center gap-1 rounded-lg p-1.5 text-zinc-400 hover:bg-[#272832] hover:text-zinc-200 transition-colors cursor-pointer"
-                title="Sao chép văn bản"
-              >
-                {copiedId === msg.id ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-              </button>
             </div>
           </div>
         </div>

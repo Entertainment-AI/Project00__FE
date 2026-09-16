@@ -11,21 +11,25 @@ import {
   Lightbulb,
   PanelLeft,
   PanelRight,
-  PanelRightClose,
   Sparkles,
-  Home,
   ShieldAlert,
+  Square,
 } from "lucide-react";
 import { ChatMessage, ChatSession, ChatSessionListItem, MessageRole, Character } from "@/types";
+import { useChatStreaming } from "@/hooks/useChatStreaming";
+import {
+  generateUUID,
+  StreamMetadataEvent,
+  StreamEventUnlockedEvent,
+  StreamDoneEvent,
+} from "@/lib/api/chatStream";
 import {
   fetchChatSession,
   fetchCharacterById,
-  sendChatMessage,
   createChatSession,
   rollbackChatMessage,
   fetchRoleplaySuggestions,
   fetchRecentSessions,
-  generateSceneImage,
   triggerTurnSceneImage,
   getSceneImageStatus,
 } from "@/lib/api";
@@ -86,7 +90,7 @@ export default function ChatPage() {
   // Affection & Emotion Level
   const [affectionScore, setAffectionScore] = useState<number>(0);
   const [character, setCharacter] = useState<Character | null>(null);
-  const [levelUpNotif, setLevelUpNotif] = useState<any | null>(null);
+  const [levelUpNotif, setLevelUpNotif] = useState<ReturnType<typeof getAffectionStage> | null>(null);
 
   // Interaction State
   const [rollbackTarget, setRollbackTarget] = useState<{ id: string; index: number } | null>(null);
@@ -96,11 +100,24 @@ export default function ChatPage() {
   const activePollingRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLElement>(null);
+  const isUserNearBottomRef = useRef(true);
+  const activeTurnIdRef = useRef<string | null>(null);
+
   const theme = THEMES[currentTheme] || THEMES.cyan;
   const currentStage = getAffectionStage(affectionScore);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const handleScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isUserNearBottomRef.current = distanceFromBottom < 100;
+  };
+
+  const scrollToBottom = (force = false) => {
+    if (force || isUserNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   // Load Saved Theme
@@ -236,67 +253,166 @@ export default function ChatPage() {
     }
   };
 
-  // Send Message with Real Backend Affection Updates
+  // 1. Streaming Hook Integration
+  const { isStreaming, sendStreamMessage, stopStreaming } = useChatStreaming({
+    sessionId,
+    onToken: (delta: string) => {
+      const currentTurnId = activeTurnIdRef.current;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.turnId === currentTurnId && m.isStreaming
+            ? { ...m, content: m.content + delta }
+            : m
+        )
+      );
+      scrollToBottom();
+    },
+    onMetadata: (meta: StreamMetadataEvent) => {
+      if (typeof meta.affectionScore === "number") {
+        const oldSt = getAffectionStage(affectionScore);
+        const newSt = getAffectionStage(meta.affectionScore);
+        setAffectionScore(meta.affectionScore);
+
+        if (newSt.level > oldSt.level) {
+          setLevelUpNotif(newSt);
+          setTimeout(() => setLevelUpNotif(null), 4500);
+        }
+
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                affectionScore: meta.affectionScore,
+                relationshipStage: meta.relationshipStage,
+                currentMood: meta.mood,
+                moodIntensity: meta.intensity,
+              }
+            : null
+        );
+      }
+    },
+    onEventUnlocked: (evt: StreamEventUnlockedEvent) => {
+      setSession((prev) => {
+        if (!prev) return null;
+        const exists = prev.unlockedEvents?.some((e) => e.eventKey === evt.eventKey);
+        if (exists) return prev;
+        return {
+          ...prev,
+          unlockedEvents: [
+            ...(prev.unlockedEvents || []),
+            { eventKey: evt.eventKey, context: evt.context, unlockedAt: new Date().toISOString() },
+          ],
+        };
+      });
+    },
+    onDone: (done: StreamDoneEvent) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.turnId === done.turnId && m.isStreaming
+            ? {
+                ...m,
+                id: done.messageId,
+                content: done.reply || m.content,
+                turnId: done.turnId,
+                isStreaming: false,
+              }
+            : m
+        )
+      );
+
+      if (done.relationship && typeof done.relationship === "object") {
+        const rel = done.relationship;
+        if (typeof rel.affectionScore === "number") {
+          const oldSt = getAffectionStage(affectionScore);
+          const newSt = getAffectionStage(rel.affectionScore as number);
+          setAffectionScore(rel.affectionScore as number);
+
+          if (newSt.level > oldSt.level) {
+            setLevelUpNotif(newSt);
+            setTimeout(() => setLevelUpNotif(null), 4500);
+          }
+
+          setSession((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              affectionScore: rel.affectionScore as number,
+              relationshipLevel: typeof rel.relationshipLevel === "number" ? rel.relationshipLevel : prev.relationshipLevel,
+              relationshipStage: typeof rel.relationshipStage === "string" ? rel.relationshipStage : prev.relationshipStage,
+              currentMood: typeof rel.currentMood === "string" ? rel.currentMood : prev.currentMood,
+              moodIntensity: typeof rel.moodIntensity === "number" ? rel.moodIntensity : prev.moodIntensity,
+            };
+          });
+        }
+      }
+      activeTurnIdRef.current = null;
+      scrollToBottom(true);
+    },
+    onError: (err: Error) => {
+      const currentTurnId = activeTurnIdRef.current;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.turnId === currentTurnId && m.isStreaming
+            ? {
+                ...m,
+                isStreaming: false,
+                content: m.content || "*(Không thể nhận phản hồi trọn vẹn do sự cố kết nối)*",
+              }
+            : m
+        )
+      );
+      activeTurnIdRef.current = null;
+      alert(err.message || "Không thể nhận phản hồi từ AI. Vui lòng thử lại!");
+    },
+  });
+
+  const handleStopGenerating = () => {
+    stopStreaming();
+    const currentTurnId = activeTurnIdRef.current;
+    if (currentTurnId) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.turnId === currentTurnId && m.isStreaming
+            ? { ...m, isStreaming: false }
+            : m
+        )
+      );
+      activeTurnIdRef.current = null;
+    }
+  };
+
+  // Send Message with Real-Time SSE Streaming
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputMessage.trim() || isSending) return;
+    if (!inputMessage.trim() || isSending || isStreaming) return;
 
     const userText = inputMessage.trim();
     setInputMessage("");
 
+    const turnId = generateUUID();
+    activeTurnIdRef.current = turnId;
+
     const tempUserMsg: ChatMessage = {
-      id: `temp-${Date.now()}`,
+      id: `temp-user-${Date.now()}`,
       role: MessageRole.User,
       content: userText,
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, tempUserMsg]);
+    const tempAssistantMsg: ChatMessage = {
+      id: `temp-assistant-${Date.now()}`,
+      role: MessageRole.Assistant,
+      content: "",
+      timestamp: new Date().toISOString(),
+      turnId,
+      isStreaming: true,
+    };
+
+    setMessages((prev) => [...prev, tempUserMsg, tempAssistantMsg]);
     setIsSending(true);
 
     try {
-      const response = await sendChatMessage(sessionId, userText);
-      const assistantMsg = {
-        ...response.assistantMessage,
-        turnId: response.turnId || response.assistantMessage.turnId || undefined,
-      };
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== tempUserMsg.id),
-        response.userMessage,
-        assistantMsg,
-      ]);
-
-      if (typeof response.affectionScore === "number") {
-        const oldSt = getAffectionStage(affectionScore);
-        const newSt = getAffectionStage(response.affectionScore);
-        setAffectionScore(response.affectionScore);
-
-        if (response.levelUp || newSt.level > oldSt.level) {
-          setLevelUpNotif(newSt);
-          setTimeout(() => setLevelUpNotif(null), 4500);
-        }
-
-        setSession((prev) => {
-          if (!prev) return null;
-          const updatedEvents = response.unlockedEvent
-            ? [...(prev.unlockedEvents || []), response.unlockedEvent]
-            : prev.unlockedEvents;
-          return {
-            ...prev,
-            affectionScore: response.affectionScore,
-            relationshipLevel: response.relationshipLevel,
-            relationshipStage: response.relationshipStage,
-            currentMood: response.currentMood,
-            moodIntensity: response.moodIntensity,
-            unlockedEvents: updatedEvents,
-            status: response.hasWalkedOut || response.sessionStatus === 2 || String(response.sessionStatus).toLowerCase() === "walkedout" ? 2 : prev.status,
-            walkOutReason: response.walkOutReason || prev.walkOutReason,
-          };
-        });
-      }
-    } catch (err: any) {
-      console.error("Error sending message", err);
-      alert(err.message || "Không thể gửi tin nhắn. Vui lòng thử lại!");
+      await sendStreamMessage({ content: userText, turnId });
     } finally {
       setIsSending(false);
     }
@@ -315,77 +431,56 @@ export default function ChatPage() {
       await rollbackChatMessage(sessionId, rollbackTarget.id);
       setMessages((prev) => prev.slice(0, rollbackTarget.index + 1));
       setRollbackTarget(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error("Error rolling back", err);
-      alert(err.message || "Không thể quay về mốc này. Vui lòng thử lại!");
+      alert(message || "Không thể quay về mốc này. Vui lòng thử lại!");
     } finally {
       setIsRollingBack(false);
     }
   };
 
   const handleContinueStory = async () => {
-    if (isSending) return;
+    if (isSending || isStreaming) return;
     const prompt = "*Lặng im quan sát, chờ xem phản ứng và diễn biến tiếp theo từ ngươi...*";
     setInputMessage("");
 
+    const turnId = generateUUID();
+    activeTurnIdRef.current = turnId;
+
     const tempUserMsg: ChatMessage = {
-      id: `temp-${Date.now()}`,
+      id: `temp-user-${Date.now()}`,
       role: MessageRole.User,
       content: prompt,
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, tempUserMsg]);
+    const tempAssistantMsg: ChatMessage = {
+      id: `temp-assistant-${Date.now()}`,
+      role: MessageRole.Assistant,
+      content: "",
+      timestamp: new Date().toISOString(),
+      turnId,
+      isStreaming: true,
+    };
+
+    setMessages((prev) => [...prev, tempUserMsg, tempAssistantMsg]);
     setIsSending(true);
 
     try {
-      const response = await sendChatMessage(sessionId, prompt);
-      const assistantMsg = {
-        ...response.assistantMessage,
-        turnId: response.turnId || response.assistantMessage.turnId || undefined,
-      };
-      setMessages((prev) => [
-        ...prev.filter((m) => m.id !== tempUserMsg.id),
-        response.userMessage,
-        assistantMsg,
-      ]);
-
-      if (typeof response.affectionScore === "number") {
-        const oldSt = getAffectionStage(affectionScore);
-        const newSt = getAffectionStage(response.affectionScore);
-        setAffectionScore(response.affectionScore);
-
-        if (response.levelUp || newSt.level > oldSt.level) {
-          setLevelUpNotif(newSt);
-          setTimeout(() => setLevelUpNotif(null), 4500);
-        }
-
-        setSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                affectionScore: response.affectionScore,
-                relationshipLevel: response.relationshipLevel,
-                currentMood: response.currentMood,
-              }
-            : null
-        );
-      }
-    } catch (err: any) {
-      console.error("Error continuing story", err);
-      alert(err.message || "Không thể tiếp tục câu chuyện. Vui lòng thử lại!");
+      await sendStreamMessage({ content: prompt, turnId });
     } finally {
       setIsSending(false);
     }
   };
 
   const handleRegenerateLastResponse = async () => {
-    if (isSending || messages.length === 0) return;
+    if (isSending || isStreaming || messages.length === 0) return;
 
     const userMessages = messages.filter(
       (m) =>
         m.role === MessageRole.User ||
-        (m.role as any) === 1 ||
+        (m.role as unknown as number) === 1 ||
         String(m.role).toLowerCase() === "user"
     );
 
@@ -394,31 +489,37 @@ export default function ChatPage() {
         ? userMessages[userMessages.length - 1].content
         : `*Nhìn ${session?.characterName || "ngươi"} với ánh mắt tò mò, chờ đợi một phản ứng khác...*`;
 
+    const turnId = generateUUID();
+    activeTurnIdRef.current = turnId;
+
+    const tempAssistantMsg: ChatMessage = {
+      id: `temp-assistant-${Date.now()}`,
+      role: MessageRole.Assistant,
+      content: "",
+      timestamp: new Date().toISOString(),
+      turnId,
+      isStreaming: true,
+    };
+
+    setMessages((prev) => {
+      const copy = [...prev];
+      for (let i = copy.length - 1; i >= 0; i--) {
+        const isAI =
+          copy[i].role === MessageRole.Assistant ||
+          (copy[i].role as unknown as number) === 2 ||
+          String(copy[i].role).toLowerCase() === "assistant";
+        if (isAI) {
+          copy.splice(i, 1);
+          break;
+        }
+      }
+      return [...copy, tempAssistantMsg];
+    });
+
     setIsSending(true);
 
     try {
-      const response = await sendChatMessage(sessionId, lastUserText);
-      const assistantMsg = {
-        ...response.assistantMessage,
-        turnId: response.turnId || response.assistantMessage.turnId || undefined,
-      };
-      setMessages((prev) => {
-        const copy = [...prev];
-        for (let i = copy.length - 1; i >= 0; i--) {
-          const isAI =
-            copy[i].role === MessageRole.Assistant ||
-            (copy[i].role as any) === 2 ||
-            String(copy[i].role).toLowerCase() === "assistant";
-          if (isAI) {
-            copy.splice(i, 1);
-            break;
-          }
-        }
-        return [...copy, assistantMsg];
-      });
-    } catch (err: any) {
-      console.error("Error regenerating response", err);
-      alert(err.message || "Không thể tạo lại phản hồi. Vui lòng thử lại!");
+      await sendStreamMessage({ content: lastUserText, turnId });
     } finally {
       setIsSending(false);
     }
@@ -512,7 +613,7 @@ export default function ChatPage() {
           setTurnImageStateMap((prev) => ({
             ...prev,
             [turnId]: {
-              status: statusRes.status as any,
+              status: statusRes.status as TurnImageState["status"],
               generationRequestId,
             },
           }));
@@ -567,13 +668,14 @@ export default function ChatPage() {
         }));
         startPolling(turnId, triggerRes.generationRequestId);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
       console.error("Error triggering scene image generation:", err);
       setTurnImageStateMap((prev) => ({
         ...prev,
         [turnId]: {
           status: "failed",
-          failureReason: err.message || "Không thể kích hoạt vẽ ảnh.",
+          failureReason: errMsg || "Không thể kích hoạt vẽ ảnh.",
         },
       }));
     }
@@ -695,7 +797,7 @@ export default function ChatPage() {
     for (let i = messages.length - 1; i >= 0; i--) {
       const isAI =
         messages[i].role === MessageRole.Assistant ||
-        (messages[i].role as any) === 2 ||
+        (messages[i].role as unknown as number) === 2 ||
         String(messages[i].role).toLowerCase() === "assistant";
       if (isAI) return i;
     }
@@ -806,7 +908,7 @@ export default function ChatPage() {
         <div className="flex flex-1 flex-col h-full min-w-0 bg-[#18191c] relative overflow-hidden">
 
         {/* Chat Messages Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        <main ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           <div className="mx-auto max-w-3xl space-y-5">
             {/* Top Character Context Banner */}
             <div className="flex flex-col items-center justify-center text-center pt-2 pb-6 border-b border-[#2c2e35]/60 animate-in fade-in duration-300">
@@ -842,7 +944,7 @@ export default function ChatPage() {
             {messages.map((msg, index) => {
               const isUser =
                 msg.role === MessageRole.User ||
-                (msg.role as any) === 1 ||
+                (msg.role as unknown as number) === 1 ||
                 String(msg.role).toLowerCase() === "user";
               const isOpeningMessage = index === 0 && !isUser;
               const isLatestAI = !isUser && index === lastAIMessageIndex;
@@ -852,7 +954,7 @@ export default function ChatPage() {
               const itemSceneImageUrl = turnImgState?.imageUrl || msg.sceneImageUrl;
               const itemSceneImageStatus =
                 turnImgState?.status ||
-                (msg.sceneImageUrl ? "completed" : (msg.sceneImageStatus as any) || "idle");
+                (msg.sceneImageUrl ? "completed" : (msg.sceneImageStatus as TurnImageState["status"]) || "idle");
               const itemFailureReason = turnImgState?.failureReason;
 
               return (
@@ -920,31 +1022,6 @@ export default function ChatPage() {
               </div>
             )}
 
-            {/* AI Typing Indicator */}
-            {isSending && (
-              <div className="flex w-full justify-start">
-                <div className="flex max-w-[85%] items-start gap-3 flex-row">
-                  <Avatar
-                    src={session?.characterAvatar}
-                    alt={session?.characterName || "AI"}
-                    size="sm"
-                    type="character"
-                    className="!rounded-2xl border border-[#3b3d46]"
-                  />
-                  <div className="rounded-2xl rounded-tl-none border border-[#31333a] bg-[#212227] px-4 py-3 shadow-md">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.3s]"></span>
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.15s]"></span>
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400"></span>
-                      <span className="ml-2 text-xs italic text-zinc-400">
-                        {session?.characterName} đang suy nghĩ...
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div ref={messagesEndRef} />
           </div>
         </main>
@@ -952,7 +1029,7 @@ export default function ChatPage() {
         {/* Input Bar */}
         <footer className="border-t border-[#23242a] bg-[#141518]/95 px-3 py-2.5 backdrop-blur-xl shrink-0">
           <div className="mx-auto max-w-3xl">
-            {session?.status === 2 || (session?.status as any) === "WalkedOut" || (session?.status as any) === "2" ? (
+            {session?.status === 2 || (session?.status as unknown as string) === "WalkedOut" || (session?.status as unknown as string) === "2" ? (
               <div className="p-4 rounded-2xl bg-red-950/30 border border-red-500/30 text-center space-y-2.5 animate-in fade-in">
                 <div className="flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-red-300">
                   <ShieldAlert className="h-4 w-4 text-red-400" />
@@ -960,7 +1037,7 @@ export default function ChatPage() {
                 </div>
                 {session?.walkOutReason && (
                   <p className="text-xs text-red-200/90 italic bg-[#171114] p-2.5 rounded-xl border border-red-500/20 max-w-lg mx-auto">
-                    "{session.walkOutReason}"
+                    &quot;{session.walkOutReason}&quot;
                   </p>
                 )}
                 <button
@@ -981,32 +1058,49 @@ export default function ChatPage() {
                   <textarea
                     rows={1}
                     value={inputMessage}
+                    disabled={isSending || isStreaming}
                     onChange={(e) => {
                       setInputMessage(e.target.value);
                       e.target.style.height = "auto";
                       e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
                     }}
                     onKeyDown={handleKeyDown}
-                    placeholder={`Nhập tin nhắn hoặc *hành động* đến ${session?.characterName}...`}
-                    className="max-h-36 min-h-[26px] flex-1 resize-none bg-transparent py-1 px-0 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-0 leading-relaxed custom-scrollbar"
+                    placeholder={
+                      isStreaming
+                        ? `${session?.characterName || "AI"} đang trả lời...`
+                        : `Nhập tin nhắn hoặc *hành động* đến ${session?.characterName}...`
+                    }
+                    className="max-h-36 min-h-[26px] flex-1 resize-none bg-transparent py-1 px-0 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-0 leading-relaxed custom-scrollbar disabled:opacity-60"
                   />
 
-                  <button
-                    type="submit"
-                    disabled={!inputMessage.trim() || isSending}
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-150 mb-0.5 ${
-                      inputMessage.trim() && !isSending
-                        ? "bg-zinc-100 text-zinc-950 font-bold shadow-sm hover:bg-white active:scale-95 cursor-pointer"
-                        : "bg-[#28292f] text-zinc-600 cursor-not-allowed opacity-40"
-                    }`}
-                    title="Gửi (Enter)"
-                  >
-                    {isSending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-300" />
-                    ) : (
-                      <Send className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                    )}
-                  </button>
+                  {isStreaming ? (
+                    <button
+                      type="button"
+                      onClick={handleStopGenerating}
+                      className="flex h-8 px-2.5 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-red-900/60 hover:bg-red-800/80 border border-red-500/40 text-red-200 text-xs font-semibold transition-all mb-0.5 cursor-pointer active:scale-95 shadow-xs"
+                      title="Dừng tạo phản hồi"
+                    >
+                      <Square className="h-3 w-3 fill-red-300 text-red-300" />
+                      <span>Dừng</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!inputMessage.trim() || isSending}
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-150 mb-0.5 ${
+                        inputMessage.trim() && !isSending
+                          ? "bg-zinc-100 text-zinc-950 font-bold shadow-sm hover:bg-white active:scale-95 cursor-pointer"
+                          : "bg-[#28292f] text-zinc-600 cursor-not-allowed opacity-40"
+                      }`}
+                      title="Gửi (Enter)"
+                    >
+                      {isSending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-300" />
+                      ) : (
+                        <Send className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      )}
+                    </button>
+                  )}
                 </form>
                 <div className="mt-1 flex items-center justify-between px-2 text-[10px] text-zinc-500">
                   <span>
