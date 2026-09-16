@@ -779,7 +779,7 @@ export default function CreateCharacterPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5 mt-3">
+                        <div className="flex items-center gap-2 mt-4">
                           <button
                             type="button"
                             onClick={() => handleGenerateAvatarAi()}
@@ -852,7 +852,7 @@ export default function CreateCharacterPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5 mt-3">
+                        <div className="flex items-center gap-2 mt-4">
                           <button
                             type="button"
                             onClick={() => handleGenerateStandeeAi()}
@@ -924,7 +924,7 @@ export default function CreateCharacterPage() {
                     />
 
                     {/* AI Draw Button for Both */}
-                    <div className="w-full mt-4">
+                    <div className="w-full mt-6">
                       <button
                         type="button"
                         onClick={() => handleGenerateBothImagesAi()}
