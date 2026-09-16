@@ -528,9 +528,9 @@ export default function EditCharacterPage() {
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-stretch">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-start">
                   {/* Dual Image Upload: Avatar + Full-Body */}
-                  <div className="sm:col-span-5 flex flex-col justify-between p-5 rounded-2xl bg-[#18191c] border border-[#2b2c34] shadow-sm">
+                  <div className="sm:col-span-5 flex flex-col p-5 rounded-2xl bg-[#18191c] border border-[#2b2c34] shadow-sm">
                     <div className="grid grid-cols-2 gap-4 items-stretch">
                       {/* Box 1: Avatar */}
                       <div className="flex flex-col items-center justify-between h-full">
@@ -744,7 +744,7 @@ export default function EditCharacterPage() {
                   </div>
 
                   {/* Info inputs */}
-                  <div className="sm:col-span-7 flex flex-col justify-between space-y-3.5">
+                  <div className="sm:col-span-7 flex flex-col space-y-3.5">
                     {/* Row 1: Tên Nhân Vật & Giới Tính */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                       <div className="sm:col-span-8">
@@ -878,7 +878,7 @@ export default function EditCharacterPage() {
                     </div>
 
                     {/* Row 4: Tiểu Sử & Cuộc Sống Thường Nhật */}
-                    <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex flex-col">
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-xs font-bold text-zinc-300">
                           Tiểu Sử & Cuộc Sống Thường Nhật <span className="text-zinc-400">*</span>
@@ -887,7 +887,8 @@ export default function EditCharacterPage() {
                       <textarea
                         value={personalityPrompt}
                         onChange={(e) => setPersonalityPrompt(e.target.value)}
-                        className="w-full flex-1 min-h-[160px] rounded-xl border border-[#31333c] bg-[#16171b] p-3.5 text-xs sm:text-sm text-zinc-100 focus:border-zinc-400 focus:outline-none leading-relaxed resize-y"
+                        rows={6}
+                        className="w-full min-h-[140px] rounded-xl border border-[#31333c] bg-[#16171b] p-3.5 text-xs sm:text-sm text-zinc-100 focus:border-zinc-400 focus:outline-none leading-relaxed resize-y"
                       />
                     </div>
                   </div>
