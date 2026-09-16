@@ -569,7 +569,7 @@ export default function EditCharacterPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-4">
+                        <div className="flex items-center gap-2 mt-5">
                           <button
                             type="button"
                             onClick={() => handleGenerateAvatarAi()}
@@ -642,7 +642,7 @@ export default function EditCharacterPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-4">
+                        <div className="flex items-center gap-2 mt-5">
                           <button
                             type="button"
                             onClick={() => handleGenerateStandeeAi()}
@@ -714,7 +714,7 @@ export default function EditCharacterPage() {
                     />
 
                     {/* AI Draw Button for Both */}
-                    <div className="w-full mt-6">
+                    <div className="w-full mt-8">
                       <button
                         type="button"
                         onClick={() => handleGenerateBothImagesAi()}
@@ -724,7 +724,7 @@ export default function EditCharacterPage() {
                             ? "Vui lòng điền Tên, Danh hiệu và Tiểu sử trước khi vẽ ảnh"
                             : "AI phân tích mô tả và vẽ cả 2 ảnh: Chân dung & Dáng đứng đồng bộ"
                         }
-                        className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#2b2c34] border border-[#3b3d46] text-zinc-200 hover:bg-[#353740] disabled:opacity-35 disabled:hover:bg-[#2b2c34] disabled:cursor-not-allowed text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-sm"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#2b2c34] border border-[#3b3d46] text-zinc-200 hover:bg-[#353740] disabled:opacity-35 disabled:hover:bg-[#2b2c34] disabled:cursor-not-allowed text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-sm"
                       >
                         {isGeneratingAvatar || isGeneratingStandee ? (
                           <>
