@@ -10,7 +10,7 @@ import {
   CharacterVoiceProfile,
   CreateLorebookEntryDto,
 } from "@/types";
-import { generateCharacterWithAi, fetchAiRandomIdeas, generateCharacterAvatar } from "@/lib/api";
+import { generateCharacterWithAi, fetchAiRandomIdeas, generateCharacterAvatar, generateCharacterStandee } from "@/lib/api";
 import { ImageCropperModal } from "@/components/ui/ImageCropperModal";
 import RelationshipMilestonesEditor from "./RelationshipMilestonesEditor";
 import {
@@ -148,6 +148,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
   const [aiIdea, setAiIdea] = useState("");
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [isGeneratingStandee, setIsGeneratingStandee] = useState(false);
   const [suggestedIdeas, setSuggestedIdeas] = useState<string[]>(() => getRandomIdeas(3));
   const [isRefreshingIdeas, setIsRefreshingIdeas] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,6 +221,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
       return;
     }
 
+    let newlyGeneratedAvatarUrl: string | null = null;
     try {
       setIsGeneratingAvatar(true);
       setError(null);
@@ -233,18 +235,39 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
         visualIdentity: targetVisualIdentity,
       });
       if (res && res.avatarUrl) {
+        newlyGeneratedAvatarUrl = res.avatarUrl;
         setAvatarUrl(res.avatarUrl);
         setRawAvatarImage(res.avatarUrl);
-      }
-      if (res && res.fullBodyUrl) {
-        setFullBodyUrl(res.fullBodyUrl);
-        setRawFullBodyImage(res.fullBodyUrl);
       }
     } catch (err: any) {
       console.warn("AI avatar generation failed:", err);
       setError(err.message || "Không thể vẽ ảnh bằng AI lúc này.");
+      return;
     } finally {
       setIsGeneratingAvatar(false);
+    }
+
+    if (newlyGeneratedAvatarUrl) {
+      try {
+        setIsGeneratingStandee(true);
+        const standeeRes = await generateCharacterStandee({
+          name: targetName,
+          title: targetTitle,
+          personalityPrompt: targetBio,
+          worldGenre: targetWorldGenre,
+          visualIdentity: targetVisualIdentity,
+          avatarUrl: newlyGeneratedAvatarUrl,
+          referenceImageUrl: newlyGeneratedAvatarUrl,
+        });
+        if (standeeRes?.standeeUrl) {
+          setFullBodyUrl(standeeRes.standeeUrl);
+          setRawFullBodyImage(standeeRes.standeeUrl);
+        }
+      } catch (standeeErr: any) {
+        console.warn("Auto-generate standee failed:", standeeErr);
+      } finally {
+        setIsGeneratingStandee(false);
+      }
     }
   };
 
@@ -730,15 +753,23 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
                       <label className="text-xs font-bold text-zinc-300 mb-2">Ảnh Toàn Thân</label>
                       <div
                         onClick={() => {
-                          if (fullBodyUrl && !isGeneratingAvatar) {
+                          if (fullBodyUrl && !isGeneratingAvatar && !isGeneratingStandee) {
                             setRawFullBodyImage(fullBodyUrl);
                             setIsFullBodyCropperOpen(true);
-                          } else {
+                          } else if (!isGeneratingAvatar && !isGeneratingStandee) {
                             fullBodyFileInputRef.current?.click();
                           }
                         }}
                         className="relative w-full max-w-[140px] sm:max-w-[160px] aspect-[2/3] rounded-2xl overflow-hidden bg-[#212227] border-2 border-[#383a44] hover:border-zinc-300 flex items-center justify-center cursor-pointer transition-all group shadow-inner ring-2 ring-black/40"
                       >
+                        {(isGeneratingStandee || isGeneratingAvatar) && (
+                          <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center text-white text-xs z-20 p-2 text-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-zinc-300 mb-1.5" />
+                            <span className="text-[11px] text-zinc-300 font-medium leading-tight">
+                              {isGeneratingAvatar ? "Chờ chân dung để đồng bộ..." : "Đang vẽ dáng đứng đồng bộ..."}
+                            </span>
+                          </div>
+                        )}
                         {fullBodyUrl ? (
                           <>
                             <img src={fullBodyUrl} alt="Toàn thân" className="w-full h-full object-cover object-top" />
@@ -822,16 +853,25 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
                     <button
                       type="button"
                       onClick={() => handleGenerateAvatarAi()}
-                      disabled={isGeneratingAvatar || !canGenerateAvatar}
+                      disabled={isGeneratingAvatar || isGeneratingStandee || !canGenerateAvatar}
                       title={
                         !canGenerateAvatar
                           ? "Vui lòng điền Tên, Danh hiệu và Tiểu sử trước khi vẽ ảnh"
-                          : "AI phân tích mô tả và vẽ cả 2 ảnh: Chân dung & Toàn thân"
+                          : "AI phân tích mô tả và vẽ cả 2 ảnh: Chân dung & Dáng đứng đồng bộ"
                       }
                       className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#26272e] border border-[#383a45] text-zinc-200 hover:bg-[#30323c] disabled:opacity-35 disabled:hover:bg-[#26272e] disabled:cursor-not-allowed text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-sm"
                     >
-                      <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
-                      {isGeneratingAvatar ? "AI Đang Vẽ 2 Ảnh..." : "AI Vẽ Cả 2 Ảnh"}
+                      {isGeneratingAvatar || isGeneratingStandee ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-zinc-300" />
+                          {isGeneratingAvatar ? "AI Đang Vẽ Chân Dung..." : "AI Đang Vẽ Dáng Đứng..."}
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
+                          AI Vẽ Cả 2 Ảnh
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

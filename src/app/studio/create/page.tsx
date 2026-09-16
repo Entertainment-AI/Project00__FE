@@ -365,13 +365,38 @@ export default function CreateCharacterPage() {
         visualIdentity: targetVisualIdentity,
       });
 
+      let newlyGeneratedAvatarUrl: string | null = null;
       if (res?.avatarUrl) {
+        newlyGeneratedAvatarUrl = res.avatarUrl;
         setAvatarUrl(res.avatarUrl);
         setRawAvatarImage(res.avatarUrl);
       }
-      if (res?.fullBodyUrl) {
-        setFullBodyUrl(res.fullBodyUrl);
-        setRawFullBodyImage(res.fullBodyUrl);
+
+      // Auto-chain standee generation so standee is always synchronized with the newly generated avatar
+      if (newlyGeneratedAvatarUrl) {
+        try {
+          setIsGeneratingAvatar(false);
+          setIsGeneratingStandee(true);
+          const standeeRes = await generateCharacterStandee({
+            name: targetName,
+            title: targetTitle,
+            personalityPrompt: targetBio,
+            worldGenre: targetWorldGenre,
+            visualIdentity: targetVisualIdentity,
+            avatarUrl: newlyGeneratedAvatarUrl,
+            referenceImageUrl: newlyGeneratedAvatarUrl,
+          });
+
+          if (standeeRes?.standeeUrl) {
+            setFullBodyUrl(standeeRes.standeeUrl);
+            setRawFullBodyImage(standeeRes.standeeUrl);
+          }
+        } catch (standeeErr) {
+          console.warn("Auto-generate standee failed after avatar generation:", standeeErr);
+          setError("Đã vẽ ảnh chân dung thành công nhưng chưa thể tạo dáng đứng. Bạn có thể bấm vẽ lại dáng đứng!");
+        } finally {
+          setIsGeneratingStandee(false);
+        }
       }
     } catch {
       setError("Không thể vẽ ảnh chân dung tự động. Vui lòng thử lại hoặc tải ảnh từ máy!");
@@ -450,84 +475,13 @@ export default function CreateCharacterPage() {
     customVisualIdentity?: CharacterVisualIdentity,
     customWorldGenre?: WorldGenre | number
   ) => {
-    if (isGeneratingAvatar || isGeneratingStandee) return;
-    const targetName = (customName || name).trim();
-    const targetTitle = (customTitle || title).trim();
-    const targetBio = (customBio || personalityPrompt).trim();
-    const normalizedStyle = normalizeVisualStyle(
-      customVisualIdentity?.style || customVisualIdentity?.visualStyle || visualStyle
+    await handleGenerateAvatarAi(
+      customName,
+      customTitle,
+      customBio,
+      customVisualIdentity,
+      customWorldGenre
     );
-    const targetVisualIdentity: CharacterVisualIdentity = {
-      ...(customVisualIdentity || {
-        gender,
-        hair,
-        eyes,
-        face,
-        ageAppearance,
-        skin,
-        body,
-        clothingStyle,
-        accessories,
-        visualTraits,
-      }),
-      style: normalizedStyle,
-      visualStyle: normalizedStyle,
-    };
-    const targetWorldGenre = customWorldGenre !== undefined ? customWorldGenre : worldGenre;
-
-    if (!targetName || !targetTitle || !targetBio) {
-      setError("Vui lòng điền đầy đủ Tên Nhân Vật, Danh Hiệu và Tiểu Sử để AI có đủ dữ kiện vẽ ảnh!");
-      return;
-    }
-
-    let generatedAvatarUrl = avatarUrl;
-    try {
-      setIsGeneratingAvatar(true);
-      setError(null);
-      const res = await generateCharacterAvatar({
-        name: targetName,
-        title: targetTitle,
-        personalityPrompt: targetBio,
-        worldGenre: targetWorldGenre,
-        visualIdentity: targetVisualIdentity,
-      });
-
-      if (res?.avatarUrl) {
-        generatedAvatarUrl = res.avatarUrl;
-        setAvatarUrl(res.avatarUrl);
-        setRawAvatarImage(res.avatarUrl);
-      }
-      if (res?.fullBodyUrl) {
-        setFullBodyUrl(res.fullBodyUrl);
-        setRawFullBodyImage(res.fullBodyUrl);
-      }
-    } catch {
-      setError("Không thể vẽ ảnh chân dung tự động. Vui lòng thử lại hoặc tải ảnh từ máy!");
-    } finally {
-      setIsGeneratingAvatar(false);
-    }
-
-    try {
-      setIsGeneratingStandee(true);
-      const standeeRes = await generateCharacterStandee({
-        name: targetName,
-        title: targetTitle,
-        personalityPrompt: targetBio,
-        worldGenre: targetWorldGenre,
-        visualIdentity: targetVisualIdentity,
-        avatarUrl: generatedAvatarUrl || undefined,
-        referenceImageUrl: generatedAvatarUrl || undefined,
-      });
-
-      if (standeeRes?.standeeUrl) {
-        setFullBodyUrl(standeeRes.standeeUrl);
-        setRawFullBodyImage(standeeRes.standeeUrl);
-      }
-    } catch {
-      console.warn("Auto-generate standee failed after avatar generation");
-    } finally {
-      setIsGeneratingStandee(false);
-    }
   };
 
   const handleAddLorebookEntry = () => {
@@ -831,7 +785,7 @@ export default function CreateCharacterPage() {
                             onClick={() => handleGenerateAvatarAi()}
                             disabled={isGeneratingAvatar || isGeneratingStandee || !canGenerateAvatar}
                             className="p-1.5 rounded-lg bg-[#2b2c34] hover:bg-[#353740] border border-[#3b3d46] text-zinc-300 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-all cursor-pointer"
-                            title="Vẽ lại ảnh chân dung bằng AI"
+                            title="Vẽ lại ảnh chân dung bằng AI (Dáng đứng sẽ tự động vẽ theo để đồng bộ)"
                           >
                             <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
                           </button>
@@ -865,19 +819,21 @@ export default function CreateCharacterPage() {
                         <div className="flex-1 flex items-center justify-center py-1 w-full">
                           <div
                             onClick={() => {
-                              if (fullBodyUrl && !isGeneratingStandee) {
+                              if (fullBodyUrl && !isGeneratingStandee && !isGeneratingAvatar) {
                                 setRawFullBodyImage(fullBodyUrl);
                                 setIsFullBodyCropperOpen(true);
-                              } else if (!isGeneratingStandee) {
+                              } else if (!isGeneratingStandee && !isGeneratingAvatar) {
                                 fullBodyFileInputRef.current?.click();
                               }
                             }}
                             className="relative w-full max-w-[140px] sm:max-w-[160px] aspect-[2/3] rounded-2xl overflow-hidden bg-[#24252a] border-2 border-[#3b3d46] hover:border-zinc-300 flex items-center justify-center cursor-pointer transition-all group shadow-inner ring-2 ring-black/40"
                           >
-                            {isGeneratingStandee && (
+                            {(isGeneratingStandee || isGeneratingAvatar) && (
                               <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center text-white text-xs z-20 p-2 text-center">
                                 <Loader2 className="h-6 w-6 animate-spin text-zinc-300 mb-1.5" />
-                                <span className="text-[11px] text-zinc-300 font-medium leading-tight">Đang vẽ dáng đứng...</span>
+                                <span className="text-[11px] text-zinc-300 font-medium leading-tight">
+                                  {isGeneratingAvatar ? "Chờ chân dung để đồng bộ..." : "Đang vẽ dáng đứng đồng bộ..."}
+                                </span>
                               </div>
                             )}
                             {fullBodyUrl ? (
@@ -902,7 +858,7 @@ export default function CreateCharacterPage() {
                             onClick={() => handleGenerateStandeeAi()}
                             disabled={isGeneratingAvatar || isGeneratingStandee || !canGenerateAvatar}
                             className="p-1.5 rounded-lg bg-[#2b2c34] hover:bg-[#353740] border border-[#3b3d46] text-zinc-300 hover:text-white disabled:opacity-35 disabled:cursor-not-allowed transition-all cursor-pointer"
-                            title="Vẽ lại ảnh dáng đứng bằng AI"
+                            title="Vẽ lại ảnh dáng đứng theo chân dung hiện tại"
                           >
                             <Wand2 className="h-3.5 w-3.5 text-zinc-300" />
                           </button>
@@ -976,7 +932,7 @@ export default function CreateCharacterPage() {
                         title={
                           !canGenerateAvatar
                             ? "Vui lòng điền Tên, Danh hiệu và Tiểu sử trước khi vẽ ảnh"
-                            : "AI phân tích mô tả và vẽ cả 2 ảnh: Chân dung & Toàn thân"
+                            : "AI phân tích mô tả và vẽ cả 2 ảnh: Chân dung & Dáng đứng đồng bộ"
                         }
                         className="w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#2b2c34] border border-[#3b3d46] text-zinc-200 hover:bg-[#353740] disabled:opacity-35 disabled:hover:bg-[#2b2c34] disabled:cursor-not-allowed text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-sm"
                       >
