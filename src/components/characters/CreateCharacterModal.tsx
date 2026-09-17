@@ -13,6 +13,7 @@ import {
 import { generateCharacterWithAi, fetchAiRandomIdeas, generateCharacterAvatar, generateCharacterStandee } from "@/lib/api";
 import { ImageCropperModal } from "@/components/ui/ImageCropperModal";
 import RelationshipMilestonesEditor from "./RelationshipMilestonesEditor";
+import { VISUAL_STYLE_OPTIONS, normalizeVisualStyle } from "@/lib/constants";
 import {
   X,
   Sparkles,
@@ -104,6 +105,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
   const [isPublic, setIsPublic] = useState(true);
 
   // Visual Identity
+  const [visualStyle, setVisualStyle] = useState("Anime");
   const [gender, setGender] = useState("Female");
   const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
   const genderDropdownRef = useRef<HTMLDivElement>(null);
@@ -202,8 +204,8 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
     const targetBio = (customPrompt || personalityPrompt).trim();
     const targetVisualIdentity: CharacterVisualIdentity = customVisualIdentity || {
       gender,
-      style: "Anime",
-      visualStyle: "Anime",
+      style: visualStyle,
+      visualStyle: visualStyle,
       hair,
       eyes,
       face,
@@ -280,7 +282,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
     try {
       setIsGeneratingAi(true);
       setError(null);
-      const generated = await generateCharacterWithAi(text, category);
+      const generated = await generateCharacterWithAi(text, category, visualStyle);
 
       if (generated) {
         setName(generated.name || "");
@@ -373,7 +375,11 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
           generated.personalityPrompt,
           generated.name,
           generated.title,
-          generated.visualIdentity || undefined,
+          {
+            ...(generated.visualIdentity || {}),
+            style: visualStyle,
+            visualStyle: visualStyle,
+          },
           generated.worldGenre !== undefined ? Number(generated.worldGenre) : undefined
         );
       }
@@ -447,8 +453,8 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
 
       const visualIdentity: CharacterVisualIdentity = {
         gender: gender || undefined,
-        style: "Anime",
-        visualStyle: "Anime",
+        style: visualStyle,
+        visualStyle: visualStyle,
         hair: hair.trim() || undefined,
         eyes: eyes.trim() || undefined,
         face: face.trim() || undefined,
@@ -546,7 +552,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2.5">
+          <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
             <div className="relative flex-1">
               <input
                 type="text"
@@ -556,6 +562,26 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
                 placeholder="Nhập ý tưởng (VD: Nữ sát thủ lạnh lùng nhưng rất thích bánh ngọt và mèo...)"
                 className="w-full rounded-xl border border-[#31333c] bg-[#121316] px-3.5 py-2.5 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-300 focus:outline-none"
               />
+            </div>
+
+            {/* Visual Style Selector */}
+            <div className="flex items-center p-0.5 bg-[#121316] border border-[#31333c] rounded-xl shrink-0 self-start sm:self-auto">
+              {VISUAL_STYLE_OPTIONS.map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => setVisualStyle(style.id)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    visualStyle === style.id
+                      ? "bg-zinc-100 text-zinc-950 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                  title={style.desc}
+                >
+                  <span>{style.id === "Anime" ? "🎨" : "📷"}</span>
+                  <span>{style.label}</span>
+                </button>
+              ))}
             </div>
 
             <button

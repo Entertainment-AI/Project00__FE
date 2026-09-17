@@ -429,7 +429,8 @@ export async function fetchRoleplaySuggestions(sessionId: string): Promise<strin
 
 export async function generateCharacterWithAI(
   idea: string,
-  category?: string
+  category?: string,
+  visualStyle?: string
 ): Promise<GeneratedCharacterDto> {
   const res = await fetch(`${API_BASE_URL}/characters/generate-ai`, {
     method: "POST",
@@ -437,7 +438,7 @@ export async function generateCharacterWithAI(
       "Content-Type": "application/json",
       ...getAuthHeader(),
     },
-    body: JSON.stringify({ idea, category }),
+    body: JSON.stringify({ idea, category, visualStyle }),
   });
   if (!res.ok) {
     const errorJson = await res.json().catch(() => null);

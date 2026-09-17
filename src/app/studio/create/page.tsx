@@ -198,7 +198,7 @@ export default function CreateCharacterPage() {
     try {
       setIsGeneratingAi(true);
       setError(null);
-      const data = await generateCharacterWithAi(textToGenerate);
+      const data = await generateCharacterWithAi(textToGenerate, undefined, visualStyle);
 
       if (data) {
         setName(data.name || "");
@@ -302,7 +302,11 @@ export default function CreateCharacterPage() {
             data.name,
             data.title,
             data.personalityPrompt,
-            data.visualIdentity || undefined,
+            {
+              ...(data.visualIdentity || {}),
+              style: visualStyle,
+              visualStyle: visualStyle,
+            },
             data.worldGenre !== undefined ? Number(data.worldGenre) : undefined
           );
         }
@@ -658,7 +662,7 @@ export default function CreateCharacterPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
               <div className="relative flex-1">
                 <input
                   type="text"
@@ -668,6 +672,26 @@ export default function CreateCharacterPage() {
                   placeholder="Nữ kiếm sĩ tsundere đến từ vương quốc tuyết rơi, ngoài lạnh trong ấm..."
                   className="w-full rounded-2xl border border-[#3b3d46] bg-[#18191c] px-4 py-3 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-300 focus:outline-none transition-colors"
                 />
+              </div>
+
+              {/* Visual Style Selector */}
+              <div className="flex items-center p-1 bg-[#18191c] border border-[#3b3d46] rounded-2xl shrink-0 self-start sm:self-auto">
+                {VISUAL_STYLE_OPTIONS.map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setVisualStyle(style.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      visualStyle === style.id
+                        ? "bg-zinc-100 text-zinc-950 shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                    title={style.desc}
+                  >
+                    <span>{style.id === "Anime" ? "🎨" : "📷"}</span>
+                    <span>{style.label}</span>
+                  </button>
+                ))}
               </div>
 
               <button
