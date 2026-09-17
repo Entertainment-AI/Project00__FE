@@ -107,7 +107,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
   // Visual Identity
   const [visualStyle, setVisualStyle] = useState("Anime");
   const [isAiStyleDropdownOpen, setIsAiStyleDropdownOpen] = useState(false);
-  const [aiStylePlacement, setAiStylePlacement] = useState<"top" | "bottom">("top");
+  const [aiStylePlacement, setAiStylePlacement] = useState<"top" | "bottom">("bottom");
   const aiStyleDropdownRef = useRef<HTMLDivElement>(null);
   const [gender, setGender] = useState("Female");
   const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
@@ -192,10 +192,13 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
       spaceBelow = Math.min(spaceBelow, modalRect.bottom - rect.bottom);
     }
 
-    if (spaceAbove < dropdownHeight && spaceBelow >= spaceAbove) {
+    // Ưu tiên mở ở dưới nếu có đủ khoảng trống bên dưới
+    if (spaceBelow >= dropdownHeight) {
       setAiStylePlacement("bottom");
-    } else {
+    } else if (spaceAbove >= dropdownHeight) {
       setAiStylePlacement("top");
+    } else {
+      setAiStylePlacement(spaceBelow >= spaceAbove ? "bottom" : "top");
     }
   };
 

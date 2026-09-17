@@ -87,7 +87,7 @@ export default function CreateCharacterPage() {
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   const styleDropdownRef = useRef<HTMLDivElement>(null);
   const [isAiStyleDropdownOpen, setIsAiStyleDropdownOpen] = useState(false);
-  const [aiStylePlacement, setAiStylePlacement] = useState<"top" | "bottom">("top");
+  const [aiStylePlacement, setAiStylePlacement] = useState<"top" | "bottom">("bottom");
   const aiStyleDropdownRef = useRef<HTMLDivElement>(null);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [rawAvatarImage, setRawAvatarImage] = useState<string | null>(null);
@@ -160,10 +160,13 @@ export default function CreateCharacterPage() {
       spaceBelow = Math.min(spaceBelow, modalRect.bottom - rect.bottom);
     }
 
-    if (spaceAbove < dropdownHeight && spaceBelow >= spaceAbove) {
+    // Ưu tiên mở ở dưới nếu có đủ khoảng trống bên dưới
+    if (spaceBelow >= dropdownHeight) {
       setAiStylePlacement("bottom");
-    } else {
+    } else if (spaceAbove >= dropdownHeight) {
       setAiStylePlacement("top");
+    } else {
+      setAiStylePlacement(spaceBelow >= spaceAbove ? "bottom" : "top");
     }
   };
 
