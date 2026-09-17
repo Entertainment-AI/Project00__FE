@@ -558,7 +558,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
           </div>
 
           {/* Omnibar Input Card */}
-          <div className="rounded-2xl border border-[#31333c] bg-[#121316] p-3 focus-within:border-zinc-400 focus-within:ring-1 focus-within:ring-zinc-400 transition-all shadow-inner">
+          <div className="rounded-2xl border border-[#31333c] bg-[#121316] p-3 shadow-inner">
             <textarea
               value={aiIdea}
               onChange={(e) => setAiIdea(e.target.value)}
