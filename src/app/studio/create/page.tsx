@@ -719,11 +719,11 @@ export default function CreateCharacterPage() {
                                 : "text-zinc-300 hover:bg-[#282932] hover:text-white"
                             }`}
                           >
-                            <div className="flex items-start gap-2.5 min-w-0 pr-2">
-                              <span className="text-base shrink-0 mt-0.5">{s.id === "Anime" ? "🎨" : "📷"}</span>
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <span className="text-base shrink-0">{s.id === "Anime" ? "🎨" : "📷"}</span>
                               <div className="min-w-0">
                                 <div className="font-semibold text-xs text-zinc-100">{s.label}</div>
-                                <div className="text-[11px] text-zinc-400 leading-snug mt-0.5 font-normal">{s.desc}</div>
+                                <div className="text-[11px] text-zinc-400 mt-0.5 font-normal whitespace-nowrap">{s.desc}</div>
                               </div>
                             </div>
                             {visualStyle === s.id && <Check className="h-4 w-4 text-zinc-200 shrink-0 ml-1" />}
