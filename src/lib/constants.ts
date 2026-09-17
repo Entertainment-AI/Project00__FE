@@ -32,8 +32,8 @@ export interface VisualStyleOption {
 }
 
 export const VISUAL_STYLE_OPTIONS: VisualStyleOption[] = [
-  { id: "Anime", label: "Hoạt Họa (Anime 2D)", model: "MeiNaMix", desc: "Nét vẽ hoạt hình 2D" },
-  { id: "Realistic", label: "Chân Thực (Người Thật)", model: "majicMIX Realistic", desc: "Ảnh chụp người thật tự nhiên" },
+  { id: "Anime", label: "Hoạt Họa", model: "MeiNaMix", desc: "Nét vẽ hoạt hình 2D" },
+  { id: "Realistic", label: "Chân Thực", model: "majicMIX Realistic", desc: "Ảnh chụp người thật tự nhiên" },
 ];
 
 export function normalizeVisualStyle(raw?: string | number): string {

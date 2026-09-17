@@ -87,6 +87,7 @@ export default function CreateCharacterPage() {
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   const styleDropdownRef = useRef<HTMLDivElement>(null);
   const [isAiStyleDropdownOpen, setIsAiStyleDropdownOpen] = useState(false);
+  const [aiStylePlacement, setAiStylePlacement] = useState<"top" | "bottom">("top");
   const aiStyleDropdownRef = useRef<HTMLDivElement>(null);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [rawAvatarImage, setRawAvatarImage] = useState<string | null>(null);
@@ -144,6 +145,46 @@ export default function CreateCharacterPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const calculateAiStylePlacement = () => {
+    if (!aiStyleDropdownRef.current) return;
+    const rect = aiStyleDropdownRef.current.getBoundingClientRect();
+    const dropdownHeight = 150;
+    const modal = aiStyleDropdownRef.current.closest(".overflow-hidden, .overflow-y-auto");
+    let spaceAbove = rect.top;
+    let spaceBelow = window.innerHeight - rect.bottom;
+
+    if (modal) {
+      const modalRect = modal.getBoundingClientRect();
+      spaceAbove = Math.min(spaceAbove, rect.top - modalRect.top);
+      spaceBelow = Math.min(spaceBelow, modalRect.bottom - rect.bottom);
+    }
+
+    if (spaceAbove < dropdownHeight && spaceBelow >= spaceAbove) {
+      setAiStylePlacement("bottom");
+    } else {
+      setAiStylePlacement("top");
+    }
+  };
+
+  const toggleAiStyleDropdown = () => {
+    if (!isAiStyleDropdownOpen) {
+      calculateAiStylePlacement();
+    }
+    setIsAiStyleDropdownOpen((prev) => !prev);
+  };
+
+  useEffect(() => {
+    if (!isAiStyleDropdownOpen) return;
+
+    calculateAiStylePlacement();
+    window.addEventListener("scroll", calculateAiStylePlacement, true);
+    window.addEventListener("resize", calculateAiStylePlacement);
+    return () => {
+      window.removeEventListener("scroll", calculateAiStylePlacement, true);
+      window.removeEventListener("resize", calculateAiStylePlacement);
+    };
+  }, [isAiStyleDropdownOpen]);
 
   // Psychology Blueprint
   const [desires, setDesires] = useState("");
@@ -691,7 +732,7 @@ export default function CreateCharacterPage() {
                 <div className="relative" ref={aiStyleDropdownRef}>
                   <button
                     type="button"
-                    onClick={() => setIsAiStyleDropdownOpen(!isAiStyleDropdownOpen)}
+                    onClick={toggleAiStyleDropdown}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#222329] hover:bg-[#2c2d35] border border-[#343640] text-xs font-semibold text-zinc-200 hover:text-white transition-all cursor-pointer shadow-sm"
                   >
                     <span className="text-sm">{selectedStyle.id === "Anime" ? "🎨" : "📷"}</span>
@@ -700,11 +741,17 @@ export default function CreateCharacterPage() {
                   </button>
 
                   {isAiStyleDropdownOpen && (
-                    <div className="absolute left-0 bottom-full mb-2 w-72 sm:w-80 rounded-2xl border border-[#383a45] bg-[#1c1d22] p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
+                    <div
+                      className={`absolute left-0 ${
+                        aiStylePlacement === "top"
+                          ? "bottom-full mb-2 slide-in-from-bottom-2"
+                          : "top-full mt-2 slide-in-from-top-2"
+                      } w-60 rounded-2xl border border-[#383a45] bg-[#1c1d22] p-1.5 shadow-2xl z-50 animate-in fade-in duration-150`}
+                    >
                       <div className="text-[10px] font-bold text-zinc-400 px-2.5 py-1 uppercase tracking-wider">
                         Phong Cách AI Vẽ
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-0.5">
                         {VISUAL_STYLE_OPTIONS.map((s) => (
                           <button
                             key={s.id}
@@ -713,13 +760,13 @@ export default function CreateCharacterPage() {
                               setVisualStyle(s.id);
                               setIsAiStyleDropdownOpen(false);
                             }}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                               visualStyle === s.id
                                 ? "bg-zinc-800 text-white font-bold"
                                 : "text-zinc-300 hover:bg-[#282932] hover:text-white"
                             }`}
                           >
-                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div className="flex items-center gap-2 min-w-0 pr-1.5">
                               <span className="text-base shrink-0">{s.id === "Anime" ? "🎨" : "📷"}</span>
                               <div className="min-w-0">
                                 <div className="font-semibold text-xs text-zinc-100">{s.label}</div>
