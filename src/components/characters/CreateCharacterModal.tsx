@@ -561,7 +561,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-200">
               <Sparkles className="h-3.5 w-3.5 text-zinc-300" />
-              <span>Kiến Trúc Sư AI (Khởi tạo nhanh)</span>
+              <span>Khởi Tạo Nhanh</span>
             </div>
           </div>
 

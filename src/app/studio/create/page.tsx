@@ -672,7 +672,7 @@ export default function CreateCharacterPage() {
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-extrabold text-zinc-100">
-                    Kiến Trúc Sư AI (Khởi Tạo Nhanh)
+                    Khởi Tạo Nhanh
                   </h3>
                   <p className="text-[11px] text-zinc-400">
                     Nhập ý tưởng ngắn gọn, AI sẽ tự động phác thảo danh tính, tâm lý và 8 mốc quan hệ
