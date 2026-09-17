@@ -582,15 +582,15 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
                 <button
                   type="button"
                   onClick={() => setIsAiStyleDropdownOpen(!isAiStyleDropdownOpen)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1c1d22] hover:bg-[#25272e] border border-[#31333c] text-xs font-semibold text-zinc-200 hover:text-white transition-all cursor-pointer shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1c1d22] hover:bg-[#25272e] border border-[#31333c] text-xs font-semibold text-zinc-200 hover:text-white transition-all cursor-pointer shadow-sm"
                 >
-                  <span className="text-xs">{visualStyle === "Anime" ? "🎨" : "📷"}</span>
-                  <span>{visualStyle === "Anime" ? "Hoạt Họa" : "Chân Thực"}</span>
-                  <ChevronDown className={`h-3 w-3 text-zinc-400 transition-transform ${isAiStyleDropdownOpen ? "rotate-180" : ""}`} />
+                  <span className="text-sm">{visualStyle === "Anime" ? "🎨" : "📷"}</span>
+                  <span>{visualStyle === "Anime" ? "Hoạt Họa (Anime 2D)" : "Chân Thực (Người Thật)"}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${isAiStyleDropdownOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 {isAiStyleDropdownOpen && (
-                  <div className="absolute left-0 bottom-full mb-1.5 w-60 rounded-xl border border-[#383a45] bg-[#1c1d22] p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="absolute left-0 bottom-full mb-2 w-72 sm:w-80 rounded-2xl border border-[#383a45] bg-[#1c1d22] p-2 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
                     <div className="text-[10px] font-bold text-zinc-400 px-2.5 py-1 uppercase tracking-wider">
                       Phong Cách AI Vẽ
                     </div>
@@ -603,20 +603,20 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
                             setVisualStyle(s.id);
                             setIsAiStyleDropdownOpen(false);
                           }}
-                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                             visualStyle === s.id
                               ? "bg-zinc-800 text-white font-bold"
                               : "text-zinc-300 hover:bg-[#282932] hover:text-white"
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm shrink-0">{s.id === "Anime" ? "🎨" : "📷"}</span>
+                          <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                            <span className="text-base shrink-0 mt-0.5">{s.id === "Anime" ? "🎨" : "📷"}</span>
                             <div className="min-w-0">
-                              <div className="font-semibold text-zinc-100">{s.label}</div>
-                              <div className="text-[10px] text-zinc-400 truncate">{s.desc}</div>
+                              <div className="font-semibold text-xs text-zinc-100">{s.label}</div>
+                              <div className="text-[11px] text-zinc-400 leading-snug mt-0.5 font-normal">{s.desc}</div>
                             </div>
                           </div>
-                          {visualStyle === s.id && <Check className="h-3.5 w-3.5 text-zinc-300 shrink-0 ml-1" />}
+                          {visualStyle === s.id && <Check className="h-4 w-4 text-zinc-200 shrink-0 ml-1" />}
                         </button>
                       ))}
                     </div>

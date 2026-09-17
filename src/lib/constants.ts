@@ -32,15 +32,15 @@ export interface VisualStyleOption {
 }
 
 export const VISUAL_STYLE_OPTIONS: VisualStyleOption[] = [
-  { id: "Anime", label: "Hoạt Họa", model: "MeiNaMix", desc: "Phong cách nghệ thuật anime 2D, manga & tranh vẽ sống động" },
-  { id: "Realistic", label: "Chân Thực", model: "majicMIX Realistic", desc: "Phong cách người thật chân thực, ánh sáng tự nhiên & đậm chất điện ảnh" },
+  { id: "Anime", label: "Hoạt Họa (Anime 2D)", model: "MeiNaMix", desc: "Tranh vẽ 2D phong cách anime & manga Nhật Bản" },
+  { id: "Realistic", label: "Chân Thực (Người Thật)", model: "majicMIX Realistic", desc: "Ảnh chụp người thật, ánh sáng tự nhiên và điện ảnh" },
 ];
 
 export function normalizeVisualStyle(raw?: string | number): string {
   if (!raw && raw !== 0) return "Realistic";
   const str = String(raw).trim().toLowerCase();
 
-  if (str === "anime" || str === "1" || str === "hoạt họa") {
+  if (str === "anime" || str === "1" || str.includes("hoạt họa") || str.includes("anime")) {
     return "Anime";
   }
 
