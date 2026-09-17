@@ -10,7 +10,7 @@ import {
   CharacterVoiceProfile,
   CreateLorebookEntryDto,
 } from "@/types";
-import { generateCharacterWithAi, fetchAiRandomIdeas, generateCharacterAvatar, generateCharacterStandee } from "@/lib/api";
+import { generateCharacterWithAi, generateCharacterAvatar, generateCharacterStandee } from "@/lib/api";
 import { ImageCropperModal } from "@/components/ui/ImageCropperModal";
 import RelationshipMilestonesEditor from "./RelationshipMilestonesEditor";
 import { VISUAL_STYLE_OPTIONS, normalizeVisualStyle } from "@/lib/constants";
@@ -27,8 +27,6 @@ import {
   Check,
   Loader2,
   Upload,
-  RotateCcw,
-  Lightbulb,
   Globe,
   Image as ImageIcon,
   Brain,
@@ -65,23 +63,6 @@ const CATEGORIES = [
   { id: "Assistant", label: "Trợ lý", icon: Bot },
   { id: "Mentor", label: "Cố vấn", icon: GraduationCap },
 ];
-
-const INSPIRATION_IDEAS = [
-  "Nữ kiếm sĩ lang thang mang theo huyết kiếm phong ấn, đơn độc săn lùng quái thú cổ đại.",
-  "Chủ tiệm trà thảo mộc kiêm thầy bói Tarot tại phố cổ, luôn thấu suốt tâm can người đối diện.",
-  "Tiểu thư quý tộc mê cơ khí ma pháp, bí mật chế tạo khinh khí cầu tại xưởng ngầm.",
-  "Thủ lĩnh lính đánh thuê thiện chiến, bề ngoài lạnh lùng nhưng nội tâm mang gánh nặng chuộc tội.",
-  "Nhà nghiên cứu khảo cổ học dị giới, ngày đêm giải mã tàn tích của nền văn minh biến mất.",
-  "Nữ hoàng đế quốc cai trị bằng bàn tay sắt, luôn ẩn giấu nỗi cô đơn trên ngai vàng quyền lực.",
-  "Nghệ sĩ vĩ cầm thiên tài có tính cách lập dị, chỉ diễn tấu dưới những cơn mưa đêm lạnh giá.",
-  "Nữ đặc vụ giải mã công nghệ Cyberpunk, sống ẩn dật giữa khu phố đèn neon rực rỡ."
-];
-
-
-function getRandomIdeas(count = 3): string[] {
-  const shuffled = [...INSPIRATION_IDEAS].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
-}
 
 type ActiveTab = "profile" | "world" | "psychology" | "lorebook" | "intimacy";
 
@@ -154,8 +135,6 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [isGeneratingStandee, setIsGeneratingStandee] = useState(false);
-  const [suggestedIdeas, setSuggestedIdeas] = useState<string[]>(() => getRandomIdeas(3));
-  const [isRefreshingIdeas, setIsRefreshingIdeas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -221,22 +200,7 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
     };
   }, [isAiStyleDropdownOpen]);
 
-  const handleRefreshSuggestions = async () => {
-    if (isRefreshingIdeas) return;
-    try {
-      setIsRefreshingIdeas(true);
-      const aiIdeas = await fetchAiRandomIdeas(3);
-      if (aiIdeas && aiIdeas.length > 0) {
-        setSuggestedIdeas(aiIdeas);
-      } else {
-        setSuggestedIdeas(getRandomIdeas(3));
-      }
-    } catch {
-      setSuggestedIdeas(getRandomIdeas(3));
-    } finally {
-      setIsRefreshingIdeas(false);
-    }
-  };
+
 
   const canGenerateAvatar = Boolean(name.trim() && title.trim() && personalityPrompt.trim());
 
@@ -694,34 +658,6 @@ export function CreateCharacterModal({ isOpen, onClose, onSubmit }: CreateCharac
                 )}
               </button>
             </div>
-          </div>
-
-          {/* Quick inspiration pills */}
-          <div className="flex items-center gap-2 mt-2.5 overflow-x-auto pb-1 text-[11px] text-zinc-400 scrollbar-none">
-            <span className="flex items-center gap-1 text-zinc-300 font-semibold shrink-0">
-              <Lightbulb className="h-3 w-3 text-zinc-400" /> Gợi ý:
-            </span>
-            {suggestedIdeas.map((idea, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  setAiIdea(idea);
-                  handleGenerateWithAi(idea);
-                }}
-                className="shrink-0 max-w-[280px] truncate px-2.5 py-1 rounded-lg bg-[#212227] hover:bg-[#2c2d35] border border-[#31333a] text-zinc-300 hover:text-white transition-colors"
-              >
-                {idea}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleRefreshSuggestions}
-              disabled={isRefreshingIdeas}
-              className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              <RotateCcw className={`h-3 w-3 ${isRefreshingIdeas ? "animate-spin" : ""}`} />
-            </button>
           </div>
         </div>
 

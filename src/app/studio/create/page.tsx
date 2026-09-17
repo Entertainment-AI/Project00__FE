@@ -12,7 +12,7 @@ import {
   CharacterVoiceProfile,
   CreateLorebookEntryDto,
 } from "@/types";
-import { createCharacter, generateCharacterWithAi, fetchAiRandomIdeas, generateCharacterAvatar, generateCharacterStandee, resolveMediaUrl } from "@/lib/api";
+import { createCharacter, generateCharacterWithAi, generateCharacterAvatar, generateCharacterStandee, resolveMediaUrl } from "@/lib/api";
 import { Header } from "@/components/layout/Header";
 import { CharacterCard } from "@/components/characters/CharacterCard";
 import { ImageCropperModal } from "@/components/ui/ImageCropperModal";
@@ -28,8 +28,6 @@ import {
   Check,
   Loader2,
   Upload,
-  RotateCcw,
-  Lightbulb,
   Globe,
   Image as ImageIcon,
   Brain,
@@ -42,17 +40,6 @@ import {
   Crop,
 } from "lucide-react";
 import Link from "next/link";
-
-const INSPIRATION_IDEAS = [
-  "Nữ kiếm sĩ lang thang mang theo huyết kiếm phong ấn, đơn độc săn lùng quái thú cổ đại.",
-  "Chủ tiệm trà thảo mộc kiêm thầy bói Tarot tại phố cổ, luôn thấu suốt tâm can người đối diện.",
-  "Tiểu thư quý tộc mê cơ khí ma pháp, bí mật chế tạo khinh khí cầu tại xưởng ngầm.",
-  "Thủ lĩnh lính đánh thuê thiện chiến, bề ngoài lạnh lùng nhưng nội tâm mang gánh nặng chuộc tội.",
-  "Nhà nghiên cứu khảo cổ học dị giới, ngày đêm giải mã tàn tích của nền văn minh biến mất.",
-  "Nữ hoàng đế quốc cai trị bằng bàn tay sắt, luôn ẩn giấu nỗi cô đơn trên ngai vàng quyền lực.",
-  "Nghệ sĩ vĩ cầm thiên tài có tính cách lập dị, chỉ diễn tấu dưới những cơn mưa đêm lạnh giá.",
-  "Nữ đặc vụ giải mã công nghệ Cyberpunk, sống ẩn dật giữa khu phố đèn neon rực rỡ."
-];
 
 const GENDER_OPTIONS = [
   { id: "Female", label: "Nữ" },
@@ -74,8 +61,7 @@ export default function CreateCharacterPage() {
   // AI Generator state
   const [aiIdea, setAiIdea] = useState("");
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [inspirationSuggestions, setInspirationSuggestions] = useState<string[]>(INSPIRATION_IDEAS.slice(0, 3));
-  const [isRefreshingIdeas, setIsRefreshingIdeas] = useState(false);
+
 
   // Form states
   const [name, setName] = useState("");
@@ -215,23 +201,7 @@ export default function CreateCharacterPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleRefreshSuggestions = async () => {
-    try {
-      setIsRefreshingIdeas(true);
-      const res = await fetchAiRandomIdeas(3);
-      if (res && res.length > 0) {
-        setInspirationSuggestions(res.slice(0, 3));
-      } else {
-        const shuffled = [...INSPIRATION_IDEAS].sort(() => 0.5 - Math.random());
-        setInspirationSuggestions(shuffled.slice(0, 3));
-      }
-    } catch {
-      const shuffled = [...INSPIRATION_IDEAS].sort(() => 0.5 - Math.random());
-      setInspirationSuggestions(shuffled.slice(0, 3));
-    } finally {
-      setIsRefreshingIdeas(false);
-    }
-  };
+
 
   const selectedGenre = getWorldGenreMeta(worldGenre);
   const selectedGender = GENDER_OPTIONS.find((g) => g.id === gender) || GENDER_OPTIONS[0];
@@ -804,38 +774,6 @@ export default function CreateCharacterPage() {
                   )}
                 </button>
               </div>
-            </div>
-
-            {/* Inspiration Chips */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold text-zinc-400 flex items-center gap-1 mr-1">
-                <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
-                Gợi ý nhanh:
-              </span>
-              {inspirationSuggestions.map((idea, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setAiIdea(idea);
-                    handleGenerateWithAi(idea);
-                  }}
-                  className="text-left text-[11px] px-3 py-1 rounded-xl bg-[#18191c] hover:bg-[#2b2c34] text-zinc-300 border border-[#31333a] hover:border-zinc-400 transition-all cursor-pointer truncate max-w-xs"
-                  title={idea}
-                >
-                  {idea}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                onClick={handleRefreshSuggestions}
-                disabled={isRefreshingIdeas}
-                className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-[#2b2c34] transition-colors"
-                title="Đổi gợi ý khác"
-              >
-                <RotateCcw className={`h-3.5 w-3.5 ${isRefreshingIdeas ? "animate-spin" : ""}`} />
-              </button>
             </div>
           </div>
 
