@@ -455,22 +455,7 @@ export async function generateCharacterWithAI(
 
 export const generateCharacterWithAi = generateCharacterWithAI;
 
-export async function fetchAIRandomIdeas(count = 3): Promise<string[]> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/characters/generate-ideas?count=${count}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    const json = await res.json();
-    const data = json?.data ?? json?.value ?? json;
-    return Array.isArray(data) ? data : [];
-  } catch (err) {
-    console.warn("Could not fetch AI random ideas:", err);
-    return [];
-  }
-}
 
-export const fetchAiRandomIdeas = fetchAIRandomIdeas;
 
 export async function generateCharacterAvatar(req: {
   name?: string;
