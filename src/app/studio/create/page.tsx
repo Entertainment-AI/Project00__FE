@@ -86,6 +86,8 @@ export default function CreateCharacterPage() {
   const [visualStyle, setVisualStyle] = useState("Anime");
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   const styleDropdownRef = useRef<HTMLDivElement>(null);
+  const [isAiStyleDropdownOpen, setIsAiStyleDropdownOpen] = useState(false);
+  const aiStyleDropdownRef = useRef<HTMLDivElement>(null);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [rawAvatarImage, setRawAvatarImage] = useState<string | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
@@ -134,6 +136,9 @@ export default function CreateCharacterPage() {
       }
       if (styleDropdownRef.current && !styleDropdownRef.current.contains(event.target as Node)) {
         setIsStyleDropdownOpen(false);
+      }
+      if (aiStyleDropdownRef.current && !aiStyleDropdownRef.current.contains(event.target as Node)) {
+        setIsAiStyleDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -662,56 +667,93 @@ export default function CreateCharacterPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={aiIdea}
-                  onChange={(e) => setAiIdea(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleGenerateWithAi()}
-                  placeholder="Nữ kiếm sĩ tsundere đến từ vương quốc tuyết rơi, ngoài lạnh trong ấm..."
-                  className="w-full rounded-2xl border border-[#3b3d46] bg-[#18191c] px-4 py-3 text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:border-zinc-300 focus:outline-none transition-colors"
-                />
-              </div>
+            {/* Omnibar Input Card */}
+            <div className="rounded-2xl border border-[#383a45] bg-[#18191c] p-3.5 sm:p-4 focus-within:border-zinc-400 focus-within:ring-1 focus-within:ring-zinc-400 transition-all shadow-inner">
+              <textarea
+                value={aiIdea}
+                onChange={(e) => setAiIdea(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!isGeneratingAi && aiIdea.trim()) {
+                      handleGenerateWithAi();
+                    }
+                  }
+                }}
+                rows={2}
+                placeholder="Nhập ý tưởng phác thảo nhân vật (VD: Nữ kiếm sĩ tsundere đến từ vương quốc tuyết rơi, ngoài lạnh trong ấm...)"
+                className="w-full bg-transparent text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none leading-relaxed"
+              />
 
-              {/* Visual Style Selector */}
-              <div className="flex items-center p-1 bg-[#18191c] border border-[#3b3d46] rounded-2xl shrink-0 self-start sm:self-auto">
-                {VISUAL_STYLE_OPTIONS.map((style) => (
+              {/* Omnibar Bottom Toolbar */}
+              <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-[#26272e]">
+                {/* Visual Style Dropdown Selector */}
+                <div className="relative" ref={aiStyleDropdownRef}>
                   <button
-                    key={style.id}
                     type="button"
-                    onClick={() => setVisualStyle(style.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      visualStyle === style.id
-                        ? "bg-zinc-100 text-zinc-950 shadow-sm"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
-                    title={style.desc}
+                    onClick={() => setIsAiStyleDropdownOpen(!isAiStyleDropdownOpen)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#222329] hover:bg-[#2c2d35] border border-[#343640] text-xs font-semibold text-zinc-200 hover:text-white transition-all cursor-pointer shadow-sm"
                   >
-                    <span>{style.id === "Anime" ? "🎨" : "📷"}</span>
-                    <span>{style.label}</span>
+                    <span className="text-sm">{selectedStyle.id === "Anime" ? "🎨" : "📷"}</span>
+                    <span>{selectedStyle.label}</span>
+                    <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform ${isAiStyleDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
-                ))}
-              </div>
 
-              <button
-                type="button"
-                onClick={() => handleGenerateWithAi()}
-                disabled={isGeneratingAi || !aiIdea.trim()}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-zinc-100 hover:bg-white text-zinc-950 px-6 py-3 text-xs sm:text-sm font-bold shadow-md active:scale-95 transition-all cursor-pointer disabled:opacity-40 shrink-0"
-              >
-                {isGeneratingAi ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
-                    <span>AI Đang Phác Thảo...</span>
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="h-4 w-4" />
-                    <span>Tự Động Sinh 7 Đặc Tính</span>
-                  </>
-                )}
-              </button>
+                  {isAiStyleDropdownOpen && (
+                    <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-[#383a45] bg-[#1c1d22] p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
+                      <div className="text-[10px] font-bold text-zinc-400 px-3 py-1 uppercase tracking-wider">
+                        Phong Cách AI Vẽ
+                      </div>
+                      <div className="space-y-1">
+                        {VISUAL_STYLE_OPTIONS.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setVisualStyle(s.id);
+                              setIsAiStyleDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                              visualStyle === s.id
+                                ? "bg-zinc-800 text-white font-bold"
+                                : "text-zinc-300 hover:bg-[#282932] hover:text-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-base shrink-0">{s.id === "Anime" ? "🎨" : "📷"}</span>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-zinc-100">{s.label}</div>
+                                <div className="text-[10px] text-zinc-400 truncate mt-0.5">{s.desc}</div>
+                              </div>
+                            </div>
+                            {visualStyle === s.id && <Check className="h-3.5 w-3.5 text-zinc-300 shrink-0 ml-1.5" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="button"
+                  onClick={() => handleGenerateWithAi()}
+                  disabled={isGeneratingAi || !aiIdea.trim()}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 px-5 py-2 text-xs sm:text-sm font-bold shadow-md active:scale-95 transition-all cursor-pointer disabled:opacity-40"
+                >
+                  {isGeneratingAi ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
+                      <span>AI Đang Phác Thảo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4" />
+                      <span>Tự Động Sinh 7 Đặc Tính</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Inspiration Chips */}
