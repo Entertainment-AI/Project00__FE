@@ -1127,7 +1127,7 @@ export default function CreateCharacterPage() {
                       </div>
                     </div>
 
-                    {/* Row 2: Danh Hiệu / Nghề Nghiệp & Phong Cách Visual */}
+                    {/* Row 2: Danh Hiệu / Nghề Nghiệp & Phong Cách Hình Ảnh */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                       <div className="sm:col-span-7">
                         <label className="block text-xs font-bold text-zinc-300 mb-1.5">
@@ -1142,10 +1142,10 @@ export default function CreateCharacterPage() {
                         />
                       </div>
 
-                      {/* Phong Cách Visual (Visual Style: Hoạt Họa ↔ Chân Thực) */}
+                      {/* Phong Cách Hình Ảnh (Visual Style: Hoạt Họa ↔ Chân Thực) */}
                       <div className="sm:col-span-5 relative" ref={styleDropdownRef}>
                         <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                          Phong Cách Visual
+                          Phong Cách Hình Ảnh
                         </label>
                         <button
                           type="button"
